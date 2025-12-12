@@ -1,4 +1,9 @@
-import Papa from "papaparse";
+import { stringify } from "csv-stringify/sync";
+import { Base64 } from "js-base64";
+import type { WCProduct, MetaProduct } from "./types";
+import { Worker } from "worker_threads";
+import path from "path";
+import os from "os";
 
 const WC_API_URL = process.env.WC_API_URL;
 const WC_CONSUMER_KEY = process.env.WC_CONSUMER_KEY;
@@ -8,7 +13,7 @@ const WC_CURRENCY = process.env.WC_CURRENCY || "USD";
 
 const MAX_RETRIES = 3;
 
-async function fetchWooCommerce(endpoint: string, params: Record<string, string> = {}) {
+export async function fetchWooCommerce(endpoint: string, params: Record<string, string> = {}) {
   if (!WC_API_URL || !WC_CONSUMER_KEY || !WC_CONSUMER_SECRET) {
     throw new Error("WooCommerce configuration missing");
   }
@@ -26,61 +31,6 @@ async function fetchWooCommerce(endpoint: string, params: Record<string, string>
     throw new Error(`WooCommerce API Error: ${response.status} ${response.statusText}`);
   }
   return response.json();
-}
-
-// Types based on WooCommerce API
-interface WCImage {
-  id: number;
-  src: string;
-}
-
-interface WCProduct {
-  id: number;
-  name: string;
-  slug: string;
-  permalink: string;
-  type: string;
-  status: string;
-  description: string;
-  short_description: string;
-  sku: string;
-  price: string;
-  regular_price: string;
-  sale_price: string;
-  date_on_sale_from: string | null;
-  date_on_sale_to: string | null;
-  stock_status: string;
-  stock_quantity: number | null;
-  images: WCImage[];
-  attributes: any[];
-  variations: number[];
-  parent_id: number;
-  categories: { id: number; name: string }[];
-}
-
-interface MetaProduct {
-  id: string;
-  title: string;
-  description: string;
-  rich_text_description?: string;
-  availability: "in stock" | "out of stock" | "preorder";
-  condition: "new" | "refurbished" | "used";
-  price: string;
-  link: string;
-  image_link: string;
-  brand: string;
-  additional_image_link?: string;
-  age_group?: string;
-  color?: string;
-  gender?: string;
-  item_group_id?: string;
-  google_product_category?: string;
-  product_type?: string;
-  sale_price?: string;
-  sale_price_effective_date?: string;
-  size?: string;
-  status: "active" | "archived";
-  inventory?: number;
 }
 
 function stripHtml(html: string): string {
@@ -106,7 +56,7 @@ function stripHtml(html: string): string {
   return decoded.replace(/\s+/g, " ").trim();
 }
 
-function mapToMetaProduct(product: WCProduct, parent?: WCProduct): MetaProduct {
+export function mapToMetaProduct(product: WCProduct, parent?: WCProduct): MetaProduct {
   // Use parent data if variation, but override with variation specific data
   const mainProduct = parent || product;
   
@@ -132,7 +82,7 @@ function mapToMetaProduct(product: WCProduct, parent?: WCProduct): MetaProduct {
   const encodedName = encodeURIComponent(title);
   const encodedPrice = encodeURIComponent(priceForImage);
   const encodedSalePrice = encodeURIComponent(salePriceForImage);
-  const encodedImg = original_image_link ? Buffer.from(original_image_link).toString("base64") : "";
+  const encodedImg = original_image_link ? Base64.encode(original_image_link, true) : "";
   
   const image_link = original_image_link ? `https://imgen.lunatik.cloud/?price=${encodedPrice}&discount_price=${encodedSalePrice}&name=${encodedName}&img=${encodedImg}` : "";
   
@@ -180,68 +130,105 @@ function mapToMetaProduct(product: WCProduct, parent?: WCProduct): MetaProduct {
   };
 }
 
-export async function generateProductFeed(): Promise<string> {
-  // 1. Fetch Products
-  const products: WCProduct[] = await fetchWooCommerce("/products", { per_page: "50" }); // Limit for demo
+async function fetchAllProducts(endpoint: string, params: Record<string, string> = {}): Promise<WCProduct[]> {
+  let allProducts: WCProduct[] = [];
+  let page = 1;
+  const perPage = 100;
   
-  const feedItems: MetaProduct[] = [];
+  console.log(`Starting fetch for ${endpoint}...`);
 
-  for (const product of products) {
-    if (product.type === "variable" && product.variations.length > 0) {
-      // Fetch variations to calculate total inventory and check availability
-      const variations: WCProduct[] = await fetchWooCommerce(`/products/${product.id}/variations`, { per_page: "100" });
-      
-      let totalInventory = 0;
-      let hasInStock = false;
-
-      for (const variation of variations) {
-        if (variation.stock_quantity) {
-          totalInventory += variation.stock_quantity;
-        }
-        if (variation.stock_status === "instock") {
-          hasInStock = true;
-        }
-      }
-
-      // Create a single product entry representing the main product
-      const item = mapToMetaProduct(product);
-      
-      // Override inventory with the sum of variations
-      item.inventory = totalInventory > 0 ? totalInventory : undefined;
-      
-      // If any variation is in stock, consider the product in stock (or use main product status if managed there)
-      if (hasInStock || product.stock_status === "instock") {
-        item.availability = "in stock";
-        feedItems.push(item);
-      }
-      
-      // Also add variations to the feed
-      for (const variation of variations) {
-        const variantItem = mapToMetaProduct(variation, product);
-        if (variantItem.availability === "in stock") {
-          feedItems.push(variantItem);
-        }
-      }
-    } else {
-      // Simple product or other types
-      const item = mapToMetaProduct(product);
-      if (item.availability === "in stock") {
-        feedItems.push(item);
-      }
+  while (true) {
+    console.log(`Fetching page ${page}...`);
+    const pageParams = { ...params, page: page.toString(), per_page: perPage.toString() };
+    const products: WCProduct[] = await fetchWooCommerce(endpoint, pageParams);
+    
+    if (products.length === 0) {
+      console.log(`Page ${page} is empty. Fetching complete.`);
+      break;
     }
+    
+    allProducts = [...allProducts, ...products];
+    console.log(`Fetched ${products.length} products (Total: ${allProducts.length})`);
+    
+    if (products.length < perPage) {
+      console.log(`Page ${page} has fewer than ${perPage} items. Fetching complete.`);
+      break;
+    }
+    
+    page++;
+  }
+  
+  console.log(`Total products fetched: ${allProducts.length}`);
+  return allProducts;
+}
+
+export async function generateProductFeed(): Promise<string> {
+  // 1. Fetch All Products (filtered by stock_status=instock)
+  const products: WCProduct[] = await fetchAllProducts("/products", { stock_status: "instock" }); 
+  
+  console.log(` fetched ${products.length} products. Starting parallel processing...`);
+
+  // 2. Parallel Processing with Workers
+  const numCPUs = os.cpus().length;
+  // Use at most 4 workers or fewer if fewer items
+  const numWorkers = Math.min(numCPUs, 4, Math.ceil(products.length / 10)); 
+  const chunkSize = Math.ceil(products.length / numWorkers);
+  
+  const workerPromises: Promise<MetaProduct[]>[] = [];
+
+  for (let i = 0; i < numWorkers; i++) {
+    const start = i * chunkSize;
+    const end = start + chunkSize;
+    const chunk = products.slice(start, end);
+    
+    if (chunk.length === 0) continue;
+
+    workerPromises.push(new Promise((resolve, reject) => {
+      const worker = new Worker(path.resolve(import.meta.dir, "worker.ts"), {
+        workerData: {
+          products: chunk,
+          WC_API_URL,
+          WC_CONSUMER_KEY,
+          WC_CONSUMER_SECRET,
+          WC_BRAND,
+          WC_CURRENCY
+        }
+      });
+      
+      worker.on("message", (result: MetaProduct[]) => resolve(result));
+      worker.on("error", reject);
+      worker.on("exit", (code) => {
+        if (code !== 0) reject(new Error(`Worker stopped with exit code ${code}`));
+      });
+    }));
   }
 
-  // 2. Convert to CSV
-  const csv = Papa.unparse(feedItems, {
-    quotes: true, // Force quotes around fields to handle HTML/commas
-    columns: [
-      "id", "title", "description", "rich_text_description", "availability", 
-      "condition", "price", "link", "image_link", "brand", 
-      "additional_image_link", "age_group", "color", "gender", 
-      "item_group_id", "google_product_category", "product_type", 
-      "sale_price", "sale_price_effective_date", "size", "status", "inventory"
-    ]
-  });
+  const results = await Promise.all(workerPromises);
+  const feedItems = results.flat();
+  
+  // 3. Convert to CSV
+  console.log(`Processing ${feedItems.length} items for CSV generation...`);
+  
+  const columns = [
+    "id", "title", "description", "rich_text_description", "availability", 
+    "condition", "price", "link", "image_link", "brand", 
+    "additional_image_link", "age_group", "color", "gender", 
+    "item_group_id", "google_product_category", "product_type", 
+    "sale_price", "sale_price_effective_date", "size", "status", "inventory"
+  ];
+
+  let csv = "";
+  try {
+    csv = stringify(feedItems, {
+      header: true,
+      columns: columns,
+      quoted: true, // Force quotes for safety
+    });
+    console.log("CSV generation complete.");
+  } catch (err) {
+    console.error("Error generating CSV:", err);
+    throw err;
+  }
 
   return csv;
 }

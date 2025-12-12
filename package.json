@@ -16,6 +16,8 @@
     "bun-plugin-tailwind": "^0.1.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "csv-stringify": "^6.6.0",
+    "js-base64": "^3.7.8",
     "lucide-react": "^0.545.0",
     "papaparse": "^5.5.3",
     "react": "^19",
