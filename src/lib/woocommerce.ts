@@ -83,16 +83,50 @@ export function mapToMetaProduct(product: WCProduct, parent?: WCProduct): MetaPr
   
   const link = product.permalink;
   const original_image_link = product.images?.[0]?.src || mainProduct.images?.[0]?.src || "";
-  const additional_image_link = product.images?.slice(1).map(i => i.src).join(",") || undefined;
+  // Only use the three generated multi-ratio images via imgen service, no additional WooCommerce images
   
-  const priceForImage = `${product.regular_price || product.price}KM`;
-  const salePriceForImage = product.sale_price ? `${product.sale_price}KM` : "";
+  const priceForImage = `${product.regular_price || product.price} KM`;
+  const salePriceForImage = product.sale_price ? `${product.sale_price} KM` : "";
   const encodedName = encodeURIComponent(title);
   const encodedPrice = encodeURIComponent(priceForImage);
   const encodedSalePrice = encodeURIComponent(salePriceForImage);
   const encodedImg = original_image_link ? Base64.encode(original_image_link, true) : "";
   
-  const image_link = original_image_link ? `https://imgen.lunatik.cloud/?price=${encodedPrice}&discount_price=${encodedSalePrice}&name=${encodedName}&img=${encodedImg}` : "";
+  // Generate multi-ratio images with tags
+  // Each ratio gets its own imgen URL with the appropriate aspect_ratio parameter
+  const imageEntries: Record<string, string> = {};
+  
+  // Always initialize image columns (even if empty) for consistent CSV structure
+  imageEntries["image[0].url"] = "";
+  imageEntries["image[0].tag[0]"] = "";
+  imageEntries["image[1].url"] = "";
+  imageEntries["image[1].tag[0]"] = "";
+  imageEntries["image[2].url"] = "";
+  imageEntries["image[2].tag[0]"] = "";
+  imageEntries["image[2].tag[1]"] = "";
+  
+  let image_link = "";
+  
+  if (original_image_link) {
+    const baseParams = `price=${encodedPrice}&discount_price=${encodedSalePrice}&name=${encodedName}&img=${encodedImg}`;
+    
+    // Image 0: DEFAULT (1:1 square, used as image_link)
+    const imgenUrl1x1 = `https://imgen.lunatik.cloud/?${baseParams}&aspect_ratio=1:1`;
+    imageEntries["image[0].url"] = imgenUrl1x1;
+    imageEntries["image[0].tag[0]"] = "DEFAULT";
+    image_link = imgenUrl1x1;
+    
+    // Image 1: 4:5 portrait (ASPECT_RATIO_4_5_PREFERRED)
+    const imgenUrl4x5 = `https://imgen.lunatik.cloud/?${baseParams}&aspect_ratio=4:5`;
+    imageEntries["image[1].url"] = imgenUrl4x5;
+    imageEntries["image[1].tag[0]"] = "ASPECT_RATIO_4_5_PREFERRED";
+    
+    // Image 2: 9:16 Stories/Reels (STORY_PREFERRED and REELS_PREFERRED)
+    const imgenUrl9x16 = `https://imgen.lunatik.cloud/?${baseParams}&aspect_ratio=9:16`;
+    imageEntries["image[2].url"] = imgenUrl9x16;
+    imageEntries["image[2].tag[0]"] = "STORY_PREFERRED";
+    imageEntries["image[2].tag[1]"] = "REELS_PREFERRED";
+  }
   
   const brand = WC_BRAND;
   
@@ -113,7 +147,7 @@ export function mapToMetaProduct(product: WCProduct, parent?: WCProduct): MetaPr
     if (name.includes("age")) age_group = option;
   }
 
-  return {
+  const baseProduct: MetaProduct & Record<string, any> = {
     id,
     title,
     description,
@@ -124,7 +158,7 @@ export function mapToMetaProduct(product: WCProduct, parent?: WCProduct): MetaPr
     link,
     image_link,
     brand,
-    additional_image_link,
+    // Only include the three generated multi-ratio images, no additional WooCommerce images
     age_group,
     color,
     gender,
@@ -140,6 +174,9 @@ export function mapToMetaProduct(product: WCProduct, parent?: WCProduct): MetaPr
     status: "active",
     inventory: product.stock_quantity ?? undefined,
   };
+
+  // Merge multi-ratio image entries
+  return { ...baseProduct, ...imageEntries };
 }
 
 async function fetchAllProducts(endpoint: string, params: Record<string, string> = {}): Promise<WCProduct[]> {
@@ -221,10 +258,16 @@ export async function generateProductFeed(): Promise<string> {
   // 3. Convert to CSV
   console.log(`Processing ${feedItems.length} items for CSV generation...`);
   
+  // Base columns + multi-ratio image columns
   const columns = [
     "id", "title", "description", "rich_text_description", "availability", 
     "condition", "price", "link", "image_link", "brand", 
-    "additional_image_link", "age_group", "color", "gender", 
+    // Multi-ratio image columns (only these three images, no additional WooCommerce images)
+    "image[0].url", "image[0].tag[0]",
+    "image[1].url", "image[1].tag[0]",
+    "image[2].url", "image[2].tag[0]", "image[2].tag[1]",
+    // Rest of columns
+    "age_group", "color", "gender", 
     "item_group_id", "google_product_category", "product_type", 
     "sale_price", "sale_price_effective_date", "size", "status", "inventory"
   ];
