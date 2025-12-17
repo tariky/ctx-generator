@@ -60,7 +60,15 @@ export function mapToMetaProduct(product: WCProduct, parent?: WCProduct): MetaPr
   // Use parent data if variation, but override with variation specific data
   const mainProduct = parent || product;
   
-  const id = `wc_${product.id}`;
+  // For main products of variable products, use a different ID to avoid conflict with item_group_id
+  // For variations, use the variation ID
+  // For simple products, use the product ID
+  const id = parent 
+    ? `wc_${product.id}` // Variation: use variation ID
+    : (product.type === "variable" && product.variations.length > 0)
+      ? `wc_${product.id}_main` // Main variable product: add suffix to avoid ID conflict
+      : `wc_${product.id}`; // Simple product: use product ID
+  
   const title = mainProduct.name;
   
   // strip HTML from description for plain description
@@ -120,7 +128,11 @@ export function mapToMetaProduct(product: WCProduct, parent?: WCProduct): MetaPr
     age_group,
     color,
     gender,
-    item_group_id: parent ? `wc_${parent.id}` : `wc_${product.id}`,
+    item_group_id: parent 
+      ? `wc_${parent.id}` // Variations: use parent ID as group ID
+      : (product.type === "variable" && product.variations.length > 0)
+        ? `wc_${product.id}` // Main variable product: use product ID as group ID (different from its own ID)
+        : undefined, // Simple products: no group ID needed
     google_product_category: "", // Map from category if possible
     product_type: product.categories?.map(c => c.name).join(" > "),
     sale_price,
