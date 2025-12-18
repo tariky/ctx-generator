@@ -56,7 +56,7 @@ function stripHtml(html: string): string {
   return decoded.replace(/\s+/g, " ").trim();
 }
 
-export function mapToMetaProduct(product: WCProduct, parent?: WCProduct): MetaProduct {
+export function mapToMetaProduct(product: WCProduct, parent?: WCProduct, style: "standard" | "christmas" = "standard"): MetaProduct {
   // Use parent data if variation, but override with variation specific data
   const mainProduct = parent || product;
   
@@ -108,7 +108,7 @@ export function mapToMetaProduct(product: WCProduct, parent?: WCProduct): MetaPr
   let image_link = "";
   
   if (original_image_link) {
-    const baseParams = `price=${encodedPrice}&discount_price=${encodedSalePrice}&name=${encodedName}&img=${encodedImg}`;
+    const baseParams = `price=${encodedPrice}&discount_price=${encodedSalePrice}&name=${encodedName}&img=${encodedImg}&style=${style}`;
     
     // Image 0: DEFAULT (1:1 square, used as image_link)
     const imgenUrl1x1 = `https://imgen.lunatik.cloud/?${baseParams}&aspect_ratio=1:1`;
@@ -211,11 +211,11 @@ async function fetchAllProducts(endpoint: string, params: Record<string, string>
   return allProducts;
 }
 
-export async function generateProductFeed(): Promise<string> {
+export async function generateProductFeed(style: "standard" | "christmas" = "standard"): Promise<string> {
   // 1. Fetch All Products (filtered by stock_status=instock)
   const products: WCProduct[] = await fetchAllProducts("/products", { stock_status: "instock" }); 
   
-  console.log(` fetched ${products.length} products. Starting parallel processing...`);
+  console.log(`Fetched ${products.length} products. Starting parallel processing with style: ${style}...`);
 
   // 2. Parallel Processing with Workers
   const numCPUs = os.cpus().length;
@@ -240,7 +240,8 @@ export async function generateProductFeed(): Promise<string> {
           WC_CONSUMER_KEY,
           WC_CONSUMER_SECRET,
           WC_BRAND,
-          WC_CURRENCY
+          WC_CURRENCY,
+          style
         }
       });
       
@@ -256,7 +257,7 @@ export async function generateProductFeed(): Promise<string> {
   const feedItems = results.flat();
   
   // 3. Convert to CSV
-  console.log(`Processing ${feedItems.length} items for CSV generation...`);
+  console.log(`Processing ${feedItems.length} items for CSV generation (style: ${style})...`);
   
   // Base columns + multi-ratio image columns
   const columns = [
@@ -279,12 +280,24 @@ export async function generateProductFeed(): Promise<string> {
       columns: columns,
       quoted: true, // Force quotes for safety
     });
-    console.log("CSV generation complete.");
+    console.log(`CSV generation complete for style: ${style}.`);
   } catch (err) {
     console.error("Error generating CSV:", err);
     throw err;
   }
 
   return csv;
+}
+
+export async function generateBothFeeds(): Promise<{ standard: string; christmas: string }> {
+  console.log("Generating both standard and christmas feeds...");
+  
+  const [standardFeed, christmasFeed] = await Promise.all([
+    generateProductFeed("standard"),
+    generateProductFeed("christmas")
+  ]);
+  
+  console.log("Both feeds generated successfully.");
+  return { standard: standardFeed, christmas: christmasFeed };
 }
 

@@ -6,7 +6,7 @@ if (!parentPort) {
   throw new Error("This file must be run as a worker");
 }
 
-const { products, WC_CURRENCY, WC_BRAND, WC_API_URL, WC_CONSUMER_KEY, WC_CONSUMER_SECRET } = workerData;
+const { products, WC_CURRENCY, WC_BRAND, WC_API_URL, WC_CONSUMER_KEY, WC_CONSUMER_SECRET, style = "standard" } = workerData;
 
 // We need to inject env vars if mapToMetaProduct depends on them (it does implicitly via global imports in original file)
 // But since we moved mapToMetaProduct to export, it still relies on module-level vars in woocommerce.ts
@@ -56,7 +56,7 @@ async function processChunk() {
           }
         }
 
-        const item = mapToMetaProduct(product);
+        const item = mapToMetaProduct(product, undefined, style);
         item.inventory = totalInventory > 0 ? totalInventory : undefined;
         
         if (hasInStock || product.stock_status === "instock") {
@@ -65,7 +65,7 @@ async function processChunk() {
         }
         
         for (const variation of variations) {
-          const variantItem = mapToMetaProduct(variation, product);
+          const variantItem = mapToMetaProduct(variation, product, style);
           if (variantItem.availability === "in stock") {
             feedItems.push(variantItem);
           }
@@ -74,7 +74,7 @@ async function processChunk() {
         console.error(`Error processing variable product ${product.id}:`, e);
       }
     } else {
-      const item = mapToMetaProduct(product);
+      const item = mapToMetaProduct(product, undefined, style);
       if (item.availability === "in stock") {
         feedItems.push(item);
       }

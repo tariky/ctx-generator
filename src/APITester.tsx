@@ -74,16 +74,26 @@ export function APITester() {
             }} 
             variant="outline"
           >
-            Generate Catalog (GET)
+            Generate Both Catalogs (GET)
+          </Button>
+        </div>
+        <div className="flex gap-4 flex-wrap justify-center">
+          <Button asChild variant="default">
+            <a href="/product_catalog_standard.csv" target="_blank" rel="noreferrer">
+              Download Standard CSV
+            </a>
           </Button>
           <Button asChild variant="default">
-            <a href="/product_catalog.csv" target="_blank" rel="noreferrer">
-              Download Generated CSV
+            <a href="/product_catalog_christmas.csv" target="_blank" rel="noreferrer">
+              Download Christmas CSV
             </a>
           </Button>
         </div>
-        <div className="text-sm text-muted-foreground">
-          Or download directly (dynamic): <a href="/api/catalog" className="underline hover:text-foreground">/api/catalog</a>
+        <div className="text-sm text-muted-foreground text-center">
+          Or download directly (dynamic): 
+          <a href="/api/catalog?style=standard" className="underline hover:text-foreground mx-1">/api/catalog?style=standard</a>
+          or
+          <a href="/api/catalog?style=christmas" className="underline hover:text-foreground mx-1">/api/catalog?style=christmas</a>
         </div>
       </div>
     </div>
