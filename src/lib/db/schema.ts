@@ -42,6 +42,15 @@ export function initSchema(db: Database): void {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       topic TEXT NOT NULL,
       wc_product_id INTEGER NOT NULL,
+      product_name TEXT,
+      product_type TEXT,
+      action_type TEXT,
+      old_stock_status TEXT,
+      new_stock_status TEXT,
+      old_stock_quantity INTEGER,
+      new_stock_quantity INTEGER,
+      stock_change INTEGER,
+      meta_retailer_id TEXT,
       payload TEXT NOT NULL,
       signature TEXT,
       processed INTEGER DEFAULT 0,
@@ -57,5 +66,8 @@ export function initSchema(db: Database): void {
     CREATE INDEX IF NOT EXISTS idx_meta_sync_status_product_id ON meta_sync_status(product_id);
     CREATE INDEX IF NOT EXISTS idx_webhook_events_processed ON webhook_events(processed);
     CREATE INDEX IF NOT EXISTS idx_webhook_events_wc_product_id ON webhook_events(wc_product_id);
+    CREATE INDEX IF NOT EXISTS idx_webhook_events_action_type ON webhook_events(action_type);
+    CREATE INDEX IF NOT EXISTS idx_webhook_events_product_name ON webhook_events(product_name);
+    CREATE INDEX IF NOT EXISTS idx_webhook_events_created_at ON webhook_events(created_at);
   `);
 }

@@ -1,6 +1,7 @@
 import { validateWebhookSignature, isValidSource } from "./validator";
 import { processWebhookEvent } from "./processor";
-import { logWebhookEvent, markWebhookProcessed, markWebhookError } from "./events";
+import { logWebhookEvent, markWebhookProcessed, markWebhookError, type WebhookEventDetails } from "./events";
+import { getProductById } from "../db/products";
 import type { WCProduct } from "../types";
 
 export async function handleWebhook(req: Request): Promise<Response> {
@@ -44,14 +45,30 @@ export async function handleWebhook(req: Request): Promise<Response> {
   console.log(`=== WEBHOOK RECEIVED ===`);
   console.log(`Topic: ${topic}`);
   console.log(`Product ID: ${productData.id}`);
+  console.log(`Product Name: ${productData.name}`);
   console.log(`Product Type: ${productData.type}`);
   console.log(`Parent ID: ${productData.parent_id}`);
   console.log(`Stock Status: ${productData.stock_status}`);
   console.log(`Stock Quantity: ${productData.stock_quantity}`);
   console.log(`========================`);
 
-  // Log webhook event
-  const eventId = logWebhookEvent(topic, productData.id, payload, signature);
+  // Get existing product state for comparison
+  const existingProduct = getProductById(productData.id);
+  const [, actionType] = topic.split(".") as [string, "created" | "updated" | "deleted" | "restored"];
+
+  // Build event details
+  const eventDetails: WebhookEventDetails = {
+    productName: productData.name,
+    productType: productData.type,
+    actionType: actionType,
+    oldStockStatus: existingProduct?.stock_status,
+    newStockStatus: productData.stock_status,
+    oldStockQuantity: existingProduct?.stock_quantity ?? undefined,
+    newStockQuantity: productData.stock_quantity ?? undefined,
+  };
+
+  // Log webhook event with details
+  const eventId = logWebhookEvent(topic, productData.id, payload, signature, eventDetails);
 
   // Return 200 immediately to avoid timeout, then process async
   const response = new Response("OK", { status: 200 });

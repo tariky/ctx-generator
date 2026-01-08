@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { WebhookViewer } from "@/components/WebhookViewer";
 import { useEffect, useState, useCallback } from "react";
 
 interface SyncStats {
@@ -47,6 +48,7 @@ export function Dashboard({ onLogout }: DashboardProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [activeTab, setActiveTab] = useState<"overview" | "webhooks">("overview");
 
   // Task progress state
   const [progress, setProgress] = useState<TaskProgress>({
@@ -223,6 +225,31 @@ export function Dashboard({ onLogout }: DashboardProps) {
             </Button>
           </div>
         </div>
+        {/* Tab Navigation */}
+        <div className="container mx-auto px-4">
+          <nav className="flex gap-4 border-t">
+            <button
+              onClick={() => setActiveTab("overview")}
+              className={`py-3 px-1 border-b-2 text-sm font-medium transition-colors ${
+                activeTab === "overview"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Overview
+            </button>
+            <button
+              onClick={() => setActiveTab("webhooks")}
+              className={`py-3 px-1 border-b-2 text-sm font-medium transition-colors ${
+                activeTab === "webhooks"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Webhook Events
+            </button>
+          </nav>
+        </div>
       </header>
 
       <main className="container mx-auto px-4 py-8">
@@ -271,251 +298,214 @@ export function Dashboard({ onLogout }: DashboardProps) {
           </div>
         )}
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Total Products</CardDescription>
-              <CardTitle className="text-3xl">{stats?.products.total || 0}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                In stock: <span className="font-medium text-green-600">{stats?.products.inStock || 0}</span>
-              </p>
-            </CardContent>
-          </Card>
+        {/* Tab Content */}
+        {activeTab === "overview" && (
+          <>
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Total Products</CardDescription>
+                  <CardTitle className="text-3xl">{stats?.products.total || 0}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    In stock: <span className="font-medium text-green-600">{stats?.products.inStock || 0}</span>
+                  </p>
+                </CardContent>
+              </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Synced to Meta</CardDescription>
-              <CardTitle className="text-3xl text-green-600">{stats?.sync.synced || 0}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Products in Meta Catalog
-              </p>
-            </CardContent>
-          </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Synced to Meta</CardDescription>
+                  <CardTitle className="text-3xl text-green-600">{stats?.sync.synced || 0}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    Products in Meta Catalog
+                  </p>
+                </CardContent>
+              </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Pending Sync</CardDescription>
-              <CardTitle className="text-3xl text-yellow-600">{stats?.sync.pending || 0}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Awaiting synchronization
-              </p>
-            </CardContent>
-          </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Pending Sync</CardDescription>
+                  <CardTitle className="text-3xl text-yellow-600">{stats?.sync.pending || 0}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    Awaiting synchronization
+                  </p>
+                </CardContent>
+              </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Sync Errors</CardDescription>
-              <CardTitle className="text-3xl text-red-600">{stats?.sync.errors || 0}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Failed to sync
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Actions */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Actions</CardTitle>
-            <CardDescription>Sync products and generate catalogs</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Sync Section */}
-            <div className="space-y-3">
-              <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">Sync with Meta Catalog</h3>
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  onClick={handleInitialSync}
-                  disabled={progress.active}
-                  size="lg"
-                >
-                  {progress.active && progress.task === "sync" ? (
-                    <>
-                      <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                      Syncing...
-                    </>
-                  ) : (
-                    "Run Initial Sync"
-                  )}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Fetches in-stock products from WooCommerce, stores in database, and syncs to Meta Catalog API
-              </p>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Sync Errors</CardDescription>
+                  <CardTitle className="text-3xl text-red-600">{stats?.sync.errors || 0}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    Failed to sync
+                  </p>
+                </CardContent>
+              </Card>
             </div>
 
-            <div className="border-t pt-6 space-y-3">
-              <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">Generate CSV Catalogs</h3>
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  onClick={handleGenerateFast}
-                  disabled={progress.active}
-                  variant="default"
-                  size="lg"
-                >
-                  {progress.active && progress.task === "generate-fast" ? (
-                    <>
-                      <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>Generate CSVs (Fast)</>
-                  )}
-                </Button>
-                <Button
-                  onClick={handleGenerateRefresh}
-                  disabled={progress.active}
-                  variant="outline"
-                  size="lg"
-                >
-                  {progress.active && progress.task === "generate-refresh" ? (
-                    <>
-                      <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                      Refreshing...
-                    </>
-                  ) : (
-                    <>Refresh from WooCommerce & Generate</>
-                  )}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                <strong>Fast:</strong> Uses cached data (~100ms) • <strong>Refresh:</strong> Fetches fresh from WooCommerce first (slower)
-              </p>
-            </div>
+            {/* Actions */}
+            <Card className="mb-8">
+              <CardHeader>
+                <CardTitle>Actions</CardTitle>
+                <CardDescription>Sync products and generate catalogs</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Sync Section */}
+                <div className="space-y-3">
+                  <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">Sync with Meta Catalog</h3>
+                  <div className="flex flex-wrap gap-3">
+                    <Button
+                      onClick={handleInitialSync}
+                      disabled={progress.active}
+                      size="lg"
+                    >
+                      {progress.active && progress.task === "sync" ? (
+                        <>
+                          <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          Syncing...
+                        </>
+                      ) : (
+                        "Run Initial Sync"
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Fetches in-stock products from WooCommerce, stores in database, and syncs to Meta Catalog API
+                  </p>
+                </div>
 
-            <div className="border-t pt-6 space-y-3">
-              <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">Download Generated Files</h3>
-              <div className="flex flex-wrap gap-3">
-                <Button variant="secondary" asChild>
-                  <a href="/product_catalog_standard.csv" target="_blank">
-                    Download Standard CSV
-                  </a>
+                <div className="border-t pt-6 space-y-3">
+                  <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">Generate CSV Catalogs</h3>
+                  <div className="flex flex-wrap gap-3">
+                    <Button
+                      onClick={handleGenerateFast}
+                      disabled={progress.active}
+                      variant="default"
+                      size="lg"
+                    >
+                      {progress.active && progress.task === "generate-fast" ? (
+                        <>
+                          <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>Generate CSVs (Fast)</>
+                      )}
+                    </Button>
+                    <Button
+                      onClick={handleGenerateRefresh}
+                      disabled={progress.active}
+                      variant="outline"
+                      size="lg"
+                    >
+                      {progress.active && progress.task === "generate-refresh" ? (
+                        <>
+                          <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          Refreshing...
+                        </>
+                      ) : (
+                        <>Refresh from WooCommerce & Generate</>
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    <strong>Fast:</strong> Uses cached data (~100ms) • <strong>Refresh:</strong> Fetches fresh from WooCommerce first (slower)
+                  </p>
+                </div>
+
+                <div className="border-t pt-6 space-y-3">
+                  <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">Download Generated Files</h3>
+                  <div className="flex flex-wrap gap-3">
+                    <Button variant="secondary" asChild>
+                      <a href="/product_catalog_standard.csv" target="_blank">
+                        Download Standard CSV
+                      </a>
+                    </Button>
+                    <Button variant="secondary" asChild>
+                      <a href="/product_catalog_christmas.csv" target="_blank">
+                        Download Christmas CSV
+                      </a>
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Download the last generated CSV files (only in-stock products)
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Webhook Stats Summary */}
+            <Card className="mb-8">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Webhook Statistics</CardTitle>
+                  <CardDescription>WooCommerce webhook events received</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setActiveTab("webhooks")}>
+                  View All Events
                 </Button>
-                <Button variant="secondary" asChild>
-                  <a href="/product_catalog_christmas.csv" target="_blank">
-                    Download Christmas CSV
-                  </a>
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Download the last generated CSV files (only in-stock products)
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-4 mb-4">
+                  <div className="text-center p-4 bg-muted rounded-lg">
+                    <div className="text-2xl font-bold">{stats?.webhooks.total || 0}</div>
+                    <div className="text-sm text-muted-foreground">Total Events</div>
+                  </div>
+                  <div className="text-center p-4 bg-green-50 rounded-lg">
+                    <div className="text-2xl font-bold text-green-600">{stats?.webhooks.processed || 0}</div>
+                    <div className="text-sm text-muted-foreground">Processed</div>
+                  </div>
+                  <div className="text-center p-4 bg-red-50 rounded-lg">
+                    <div className="text-2xl font-bold text-red-600">{stats?.webhooks.errors || 0}</div>
+                    <div className="text-sm text-muted-foreground">Errors</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-        {/* Webhook Stats */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Webhook Statistics</CardTitle>
-            <CardDescription>WooCommerce webhook events received</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-3 gap-4 mb-4">
-              <div className="text-center p-4 bg-muted rounded-lg">
-                <div className="text-2xl font-bold">{stats?.webhooks.total || 0}</div>
-                <div className="text-sm text-muted-foreground">Total Events</div>
-              </div>
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">{stats?.webhooks.processed || 0}</div>
-                <div className="text-sm text-muted-foreground">Processed</div>
-              </div>
-              <div className="text-center p-4 bg-red-50 rounded-lg">
-                <div className="text-2xl font-bold text-red-600">{stats?.webhooks.errors || 0}</div>
-                <div className="text-sm text-muted-foreground">Errors</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            {/* Webhook Setup Instructions */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Webhook Setup Guide</CardTitle>
+                <CardDescription>Configure WooCommerce to send real-time product updates</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="bg-muted p-4 rounded-lg">
+                  <p className="font-medium mb-2">Webhook URL:</p>
+                  <code className="bg-background px-3 py-2 rounded block text-sm break-all">
+                    {window.location.origin}/api/webhooks/woocommerce
+                  </code>
+                </div>
+                <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
+                  <li>Go to <strong className="text-foreground">WooCommerce → Settings → Advanced → Webhooks</strong></li>
+                  <li>Click <strong className="text-foreground">Add webhook</strong></li>
+                  <li>Set the <strong className="text-foreground">Delivery URL</strong> to the URL above</li>
+                  <li>Create webhooks for these topics:
+                    <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
+                      <li><code className="bg-muted px-1 rounded">Product created</code></li>
+                      <li><code className="bg-muted px-1 rounded">Product updated</code></li>
+                      <li><code className="bg-muted px-1 rounded">Product deleted</code></li>
+                    </ul>
+                  </li>
+                  <li>Set the <strong className="text-foreground">Secret</strong> to match your <code className="bg-muted px-1 rounded">WC_WEBHOOK_SECRET</code> environment variable</li>
+                </ol>
+              </CardContent>
+            </Card>
+          </>
+        )}
 
-        {/* Recent Webhooks */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Recent Webhook Events</CardTitle>
-            <CardDescription>Last 5 webhook events received from WooCommerce</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {stats?.recentWebhooks && stats.recentWebhooks.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-2 px-4 font-medium">Time</th>
-                      <th className="text-left py-2 px-4 font-medium">Topic</th>
-                      <th className="text-left py-2 px-4 font-medium">Product ID</th>
-                      <th className="text-left py-2 px-4 font-medium">Status</th>
-                      <th className="text-left py-2 px-4 font-medium">Error</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stats.recentWebhooks.map((event) => (
-                      <tr key={event.id} className="border-b hover:bg-muted/50">
-                        <td className="py-3 px-4 whitespace-nowrap text-muted-foreground">
-                          {formatDate(event.created_at)}
-                        </td>
-                        <td className="py-3 px-4">
-                          <code className="bg-muted px-2 py-1 rounded text-xs font-mono">
-                            {event.topic}
-                          </code>
-                        </td>
-                        <td className="py-3 px-4 font-mono">{event.wc_product_id}</td>
-                        <td className="py-3 px-4">
-                          {getStatusBadge(event.processed, event.error)}
-                        </td>
-                        <td className="py-3 px-4 text-red-600 text-xs max-w-xs truncate">
-                          {event.error || "-"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <p>No webhook events yet.</p>
-                <p className="text-sm mt-1">Configure your WooCommerce webhooks to start receiving events.</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Webhook Setup Instructions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Webhook Setup Guide</CardTitle>
-            <CardDescription>Configure WooCommerce to send real-time product updates</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="bg-muted p-4 rounded-lg">
-              <p className="font-medium mb-2">Webhook URL:</p>
-              <code className="bg-background px-3 py-2 rounded block text-sm break-all">
-                {window.location.origin}/api/webhooks/woocommerce
-              </code>
-            </div>
-            <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-              <li>Go to <strong className="text-foreground">WooCommerce → Settings → Advanced → Webhooks</strong></li>
-              <li>Click <strong className="text-foreground">Add webhook</strong></li>
-              <li>Set the <strong className="text-foreground">Delivery URL</strong> to the URL above</li>
-              <li>Create webhooks for these topics:
-                <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
-                  <li><code className="bg-muted px-1 rounded">Product created</code></li>
-                  <li><code className="bg-muted px-1 rounded">Product updated</code></li>
-                  <li><code className="bg-muted px-1 rounded">Product deleted</code></li>
-                </ul>
-              </li>
-              <li>Set the <strong className="text-foreground">Secret</strong> to match your <code className="bg-muted px-1 rounded">WC_WEBHOOK_SECRET</code> environment variable</li>
-            </ol>
-          </CardContent>
-        </Card>
+        {activeTab === "webhooks" && (
+          <WebhookViewer />
+        )}
       </main>
     </div>
   );

@@ -7,7 +7,7 @@ import { performInitialSync } from "./lib/sync/initial-sync";
 import { getCatalogInfo, getCatalogProducts, testSingleProductCreate, checkCatalogDiagnostics, getProductErrors, checkBatchStatus, getProductDetails, getProductsByGroupId } from "./lib/meta/client";
 import { getProductCount, getInStockCount, getAllProducts } from "./lib/db/products";
 import { getSyncedCount, getPendingCount, getErrorCount } from "./lib/db/sync-status";
-import { getWebhookEventCount, getRecentWebhookEvents } from "./lib/webhooks/events";
+import { getWebhookEventCount, getRecentWebhookEvents, searchWebhookEvents, getWebhookStats, getWebhookEventById } from "./lib/webhooks/events";
 import { getDb } from "./lib/db/index";
 import {
   validateCredentials,
@@ -370,6 +370,66 @@ const server = serve({
         return Response.json(products);
       } catch (error) {
         console.error("Error fetching group products:", error);
+        return Response.json(
+          { error: String(error) },
+          { status: 500 }
+        );
+      }
+    },
+
+    "/api/webhooks": {
+      async GET(req) {
+        try {
+          const url = new URL(req.url);
+          const params = {
+            search: url.searchParams.get("search") || undefined,
+            actionType: url.searchParams.get("actionType") || undefined,
+            productId: url.searchParams.get("productId") ? parseInt(url.searchParams.get("productId")!) : undefined,
+            processed: url.searchParams.get("processed") !== null ? url.searchParams.get("processed") === "true" : undefined,
+            hasError: url.searchParams.get("hasError") !== null ? url.searchParams.get("hasError") === "true" : undefined,
+            limit: parseInt(url.searchParams.get("limit") || "20"),
+            offset: parseInt(url.searchParams.get("offset") || "0"),
+          };
+          const result = searchWebhookEvents(params);
+          return Response.json(result);
+        } catch (error) {
+          console.error("Error searching webhooks:", error);
+          return Response.json(
+            { error: String(error) },
+            { status: 500 }
+          );
+        }
+      },
+    },
+
+    "/api/webhooks/stats": {
+      async GET(req) {
+        try {
+          const stats = getWebhookStats();
+          return Response.json(stats);
+        } catch (error) {
+          console.error("Error getting webhook stats:", error);
+          return Response.json(
+            { error: String(error) },
+            { status: 500 }
+          );
+        }
+      },
+    },
+
+    "/api/webhooks/:id": async (req) => {
+      try {
+        const eventId = parseInt(req.params.id);
+        const event = getWebhookEventById(eventId);
+        if (!event) {
+          return Response.json(
+            { error: "Webhook event not found" },
+            { status: 404 }
+          );
+        }
+        return Response.json(event);
+      } catch (error) {
+        console.error("Error getting webhook event:", error);
         return Response.json(
           { error: String(error) },
           { status: 500 }

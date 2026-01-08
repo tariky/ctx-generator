@@ -1,5 +1,6 @@
 import { Database } from "bun:sqlite";
 import { initSchema } from "./schema";
+import { runMigrations } from "./migrations";
 import { mkdirSync, existsSync } from "fs";
 import { dirname, resolve } from "path";
 
@@ -25,6 +26,7 @@ export function getDb(): Database {
     db.exec("PRAGMA journal_mode = WAL");
     db.exec("PRAGMA foreign_keys = ON");
     initSchema(db);
+    runMigrations(db);
   }
   return db;
 }
