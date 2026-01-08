@@ -4,6 +4,7 @@ import type { WCProduct, MetaProduct } from "./types";
 import { Worker } from "worker_threads";
 import path from "path";
 import os from "os";
+import { generateMetaRetailerId, generateItemGroupId } from "./utils/retailer-id";
 
 const WC_API_URL = process.env.WC_API_URL;
 const WC_CONSUMER_KEY = process.env.WC_CONSUMER_KEY;
@@ -71,14 +72,8 @@ export function mapToMetaProduct(
 	// Use parent data if variation, but override with variation specific data
 	const mainProduct = parent || product;
 
-	// For main products of variable products, use a different ID to avoid conflict with item_group_id
-	// For variations, use the variation ID
-	// For simple products, use the product ID
-	const id = parent
-		? `wc_${product.id}` // Variation: use variation ID
-		: product.type === "variable" && product.variations.length > 0
-		? `wc_${product.id}_main` // Main variable product: add suffix to avoid ID conflict
-		: `wc_${product.id}`; // Simple product: use product ID
+	// Use centralized ID generation for consistency across sync and webhooks
+	const id = generateMetaRetailerId(product, parent);
 
 	const title = mainProduct.name;
 
@@ -196,11 +191,8 @@ export function mapToMetaProduct(
 		color,
 		gender,
 		size,
-		item_group_id: parent
-			? `wc_${parent.id}` // Variations: use parent ID as group ID
-			: product.type === "variable" && product.variations.length > 0
-			? `wc_${product.id}` // Main variable product: use product ID as group ID (different from its own ID)
-			: undefined, // Simple products: no group ID needed
+		// Use centralized item_group_id generation for consistency
+		item_group_id: generateItemGroupId(product, parent),
 		google_product_category: "", // Map from category if possible
 		product_type: product.categories?.map((c) => c.name).join(" > "),
 		sale_price,

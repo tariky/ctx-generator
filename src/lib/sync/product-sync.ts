@@ -3,17 +3,8 @@ import { upsertProduct, getProductById } from "../db/products";
 import { getSyncStatusByProductId, upsertSyncStatus, markSynced, markError } from "../db/sync-status";
 import { syncProductToMeta, createBatchItem } from "../meta/catalog";
 import { getProductByRetailerId, batchUpsertProducts } from "../meta/client";
+import { generateMetaRetailerId } from "../utils/retailer-id";
 import type { WCProduct } from "../types";
-
-function generateMetaRetailerId(product: WCProduct, parent?: WCProduct): string {
-  if (product.parent_id > 0) {
-    return `wc_${product.id}`;
-  }
-  if (product.type === "variable") {
-    return `wc_${product.id}_main`;
-  }
-  return `wc_${product.id}`;
-}
 
 function mapAvailability(stockStatus: string): "in stock" | "out of stock" | "preorder" {
   switch (stockStatus) {

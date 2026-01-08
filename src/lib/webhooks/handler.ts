@@ -40,6 +40,16 @@ export async function handleWebhook(req: Request): Promise<Response> {
     return new Response("Invalid JSON", { status: 400 });
   }
 
+  // Log webhook details for debugging
+  console.log(`=== WEBHOOK RECEIVED ===`);
+  console.log(`Topic: ${topic}`);
+  console.log(`Product ID: ${productData.id}`);
+  console.log(`Product Type: ${productData.type}`);
+  console.log(`Parent ID: ${productData.parent_id}`);
+  console.log(`Stock Status: ${productData.stock_status}`);
+  console.log(`Stock Quantity: ${productData.stock_quantity}`);
+  console.log(`========================`);
+
   // Log webhook event
   const eventId = logWebhookEvent(topic, productData.id, payload, signature);
 

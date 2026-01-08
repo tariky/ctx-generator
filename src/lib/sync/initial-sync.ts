@@ -3,6 +3,7 @@ import { bulkUpsertProducts, upsertProduct, getProductById } from "../db/product
 import { upsertSyncStatus, markSynced } from "../db/sync-status";
 import { batchSyncProducts, createBatchItem } from "../meta/catalog";
 import { fetchCatalogState, batchUpsertProducts } from "../meta/client";
+import { generateMetaRetailerId } from "../utils/retailer-id";
 import type { WCProduct, MetaProduct } from "../types";
 import type { MetaBatchItem } from "../meta/types";
 
@@ -16,16 +17,6 @@ export interface SyncReport {
   updated: number;
   errors: number;
   skipped: number;
-}
-
-function generateMetaRetailerId(product: WCProduct, parent?: WCProduct): string {
-  if (product.parent_id > 0) {
-    return `wc_${product.id}`;
-  }
-  if (product.type === "variable") {
-    return `wc_${product.id}_main`;
-  }
-  return `wc_${product.id}`;
 }
 
 export async function performInitialSync(): Promise<SyncReport> {
