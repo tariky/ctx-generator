@@ -128,35 +128,70 @@ export async function performInitialSync(): Promise<SyncReport> {
 
     // Step 5: Execute batch sync in chunks (Meta limit: ~1000 items per batch)
     const BATCH_SIZE = 1000;
+    const batchHandles: string[] = [];
+
     for (let i = 0; i < batchItems.length; i += BATCH_SIZE) {
       const chunk = batchItems.slice(i, i + BATCH_SIZE);
-      console.log(`Syncing batch ${Math.floor(i / BATCH_SIZE) + 1} (${chunk.length} items)...`);
+      const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+      console.log(`Syncing batch ${batchNum} (${chunk.length} items)...`);
 
       try {
         const result = await batchUpsertProducts(chunk);
 
+        // Log full result for debugging
+        console.log(`Batch ${batchNum} result:`, JSON.stringify(result, null, 2));
+
         if (result.error) {
-          console.error("Batch sync error:", result.error);
+          console.error(`Batch ${batchNum} error:`, result.error);
           report.errors += chunk.length;
           continue;
         }
 
-        // Process validation results
-        for (const item of chunk) {
-          const validationError = result.validation_status?.find(
-            (v) => v.retailer_id === item.retailer_id && v.errors?.length
-          );
+        // Track handles for async processing
+        if (result.handles && result.handles.length > 0) {
+          console.log(`Batch ${batchNum} handles:`, result.handles);
+          batchHandles.push(...result.handles);
+        }
 
-          if (validationError?.errors?.length) {
-            report.errors++;
-            const productId = productIdMap.get(item.retailer_id);
-            if (productId) {
-              upsertSyncStatus(productId, item.retailer_id, {
-                sync_status: "error",
-                last_error: validationError.errors.map((e) => e.message).join(", "),
-              });
+        // Process validation results if present
+        if (result.validation_status) {
+          for (const item of chunk) {
+            const validationError = result.validation_status?.find(
+              (v) => v.retailer_id === item.retailer_id && v.errors?.length
+            );
+
+            if (validationError?.errors?.length) {
+              report.errors++;
+              console.error(`Validation error for ${item.retailer_id}:`, validationError.errors);
+              const productId = productIdMap.get(item.retailer_id);
+              if (productId) {
+                upsertSyncStatus(productId, item.retailer_id, {
+                  sync_status: "error",
+                  last_error: validationError.errors.map((e) => e.message).join(", "),
+                });
+              }
+            } else {
+              if (item.method === "CREATE") {
+                report.created++;
+              } else {
+                report.updated++;
+              }
+              report.synced++;
+
+              const productId = productIdMap.get(item.retailer_id);
+              if (productId) {
+                markSynced(
+                  item.retailer_id,
+                  item.data.availability || "in stock",
+                  item.data.inventory ?? null
+                );
+              }
             }
-          } else {
+          }
+        } else {
+          // No validation_status means assume success (async processing)
+          console.log(`Batch ${batchNum} submitted for async processing`);
+          for (const item of chunk) {
             if (item.method === "CREATE") {
               report.created++;
             } else {
@@ -175,9 +210,14 @@ export async function performInitialSync(): Promise<SyncReport> {
           }
         }
       } catch (error) {
-        console.error("Batch sync error:", error);
+        console.error(`Batch ${batchNum} error:`, error);
         report.errors += chunk.length;
       }
+    }
+
+    if (batchHandles.length > 0) {
+      console.log(`Total batch handles for tracking: ${batchHandles.length}`);
+      console.log(`Note: Products are being processed asynchronously by Meta. Check Commerce Manager in a few minutes.`);
     }
 
     report.completedAt = new Date();

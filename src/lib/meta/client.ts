@@ -98,19 +98,38 @@ export async function batchUpsertProducts(
 
   const url = `${META_BASE_URL}/${META_CATALOG_ID}/items_batch`;
 
+  const requestBody = {
+    item_type: "PRODUCT_ITEM",
+    requests: items.map(item => ({
+      method: item.method,
+      retailer_id: item.retailer_id,
+      data: item.data,
+    })),
+  };
+
+  console.log(`Sending batch request to: ${url}`);
+  console.log(`Batch size: ${items.length} items`);
+  console.log(`First item sample:`, JSON.stringify(items[0], null, 2));
+
   const response = await fetch(url, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${META_ACCESS_TOKEN}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      item_type: "PRODUCT_ITEM",
-      requests: items,
-    }),
+    body: JSON.stringify(requestBody),
   });
 
-  return response.json() as Promise<MetaBatchResponse>;
+  const result = await response.json() as MetaBatchResponse;
+
+  console.log(`Batch response status: ${response.status}`);
+  console.log(`Batch response:`, JSON.stringify(result, null, 2));
+
+  if (!response.ok) {
+    console.error(`Meta API HTTP Error: ${response.status}`);
+  }
+
+  return result;
 }
 
 export async function updateProductStock(
@@ -146,4 +165,124 @@ export async function fetchCatalogState(): Promise<Map<string, MetaCatalogProduc
   }
 
   return map;
+}
+
+export async function getCatalogInfo(): Promise<any> {
+  validateConfig();
+
+  const url = `${META_BASE_URL}/${META_CATALOG_ID}?fields=id,name,product_count,vertical`;
+
+  console.log(`Fetching catalog info from: ${url}`);
+
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${META_ACCESS_TOKEN}` },
+  });
+
+  const data = await response.json();
+  console.log(`Catalog info:`, JSON.stringify(data, null, 2));
+
+  return data;
+}
+
+export async function checkBatchStatus(handleId: string): Promise<any> {
+  validateConfig();
+
+  const url = `${META_BASE_URL}/${handleId}`;
+
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${META_ACCESS_TOKEN}` },
+  });
+
+  return response.json();
+}
+
+export async function testSingleProductCreate(testProduct: {
+  retailer_id: string;
+  name: string;
+  description: string;
+  availability: string;
+  price: string;
+  url: string;
+  image_link: string;
+  brand: string;
+}): Promise<any> {
+  validateConfig();
+
+  const url = `${META_BASE_URL}/${META_CATALOG_ID}/items_batch`;
+
+  const requestBody = {
+    item_type: "PRODUCT_ITEM",
+    requests: [{
+      method: "CREATE",
+      retailer_id: testProduct.retailer_id,
+      data: {
+        name: testProduct.name,
+        description: testProduct.description || "No description",
+        availability: testProduct.availability,
+        price: testProduct.price,
+        url: testProduct.url,
+        image_link: testProduct.image_link,
+        brand: testProduct.brand,
+        condition: "new",
+      },
+    }],
+  };
+
+  console.log("Test product request:", JSON.stringify(requestBody, null, 2));
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${META_ACCESS_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  const result = await response.json();
+  console.log("Test product response:", JSON.stringify(result, null, 2));
+
+  return {
+    httpStatus: response.status,
+    result,
+    requestSent: requestBody,
+  };
+}
+
+export async function getProductErrors(limit = 50): Promise<any> {
+  validateConfig();
+
+  // Fetch products with errors from the catalog
+  const url = `${META_BASE_URL}/${META_CATALOG_ID}/product_groups?fields=retailer_id,errors&limit=${limit}`;
+
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${META_ACCESS_TOKEN}` },
+  });
+
+  return response.json();
+}
+
+export async function checkCatalogDiagnostics(): Promise<any> {
+  validateConfig();
+
+  // Check catalog diagnostics for any issues
+  const url = `${META_BASE_URL}/${META_CATALOG_ID}?fields=id,name,product_count,vertical,da_display_settings`;
+
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${META_ACCESS_TOKEN}` },
+  });
+
+  const catalogInfo = await response.json();
+
+  // Also check for product feed status
+  const feedsUrl = `${META_BASE_URL}/${META_CATALOG_ID}/product_feeds?fields=id,name,product_count,latest_upload`;
+  const feedsResponse = await fetch(feedsUrl, {
+    headers: { Authorization: `Bearer ${META_ACCESS_TOKEN}` },
+  });
+  const feedsInfo = await feedsResponse.json();
+
+  return {
+    catalog: catalogInfo,
+    feeds: feedsInfo,
+  };
 }

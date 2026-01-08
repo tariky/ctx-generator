@@ -4,6 +4,7 @@ import { generateProductFeed, generateBothFeeds } from "./lib/woocommerce";
 import { generateFastProductFeed, generateBothFastFeeds, refreshAndGenerateFeed } from "./lib/csv-generator";
 import { handleWebhook } from "./lib/webhooks/handler";
 import { performInitialSync } from "./lib/sync/initial-sync";
+import { getCatalogInfo, getCatalogProducts, testSingleProductCreate, checkCatalogDiagnostics, getProductErrors, checkBatchStatus } from "./lib/meta/client";
 import { getProductCount, getInStockCount, getAllProducts } from "./lib/db/products";
 import { getSyncedCount, getPendingCount, getErrorCount } from "./lib/db/sync-status";
 import { getWebhookEventCount, getRecentWebhookEvents } from "./lib/webhooks/events";
@@ -199,6 +200,86 @@ const server = serve({
           );
         }
       },
+    },
+
+    "/api/meta/catalog": {
+      async GET(req) {
+        try {
+          const catalogInfo = await getCatalogInfo();
+          const products = await getCatalogProducts();
+          return Response.json({
+            catalog: catalogInfo,
+            productCount: products.length,
+            sampleProducts: products.slice(0, 5),
+          });
+        } catch (error) {
+          console.error("Error getting catalog info:", error);
+          return Response.json(
+            { error: String(error) },
+            { status: 500 }
+          );
+        }
+      },
+    },
+
+    "/api/meta/diagnostics": {
+      async GET(req) {
+        try {
+          const diagnostics = await checkCatalogDiagnostics();
+          const errors = await getProductErrors(20);
+          return Response.json({
+            ...diagnostics,
+            productErrors: errors,
+          });
+        } catch (error) {
+          console.error("Error getting diagnostics:", error);
+          return Response.json(
+            { error: String(error) },
+            { status: 500 }
+          );
+        }
+      },
+    },
+
+    "/api/meta/test-product": {
+      async POST(req) {
+        try {
+          // Test creating a single product with minimal data
+          const testProduct = {
+            retailer_id: `test_${Date.now()}`,
+            name: "Test Product",
+            description: "This is a test product to verify Meta Catalog API connection",
+            availability: "in stock",
+            price: "10.00 BAM",
+            url: "https://example.com/test-product",
+            image_link: "https://via.placeholder.com/500x500.png?text=Test+Product",
+            brand: "Test Brand",
+          };
+
+          const result = await testSingleProductCreate(testProduct);
+          return Response.json(result);
+        } catch (error) {
+          console.error("Error testing product creation:", error);
+          return Response.json(
+            { error: String(error) },
+            { status: 500 }
+          );
+        }
+      },
+    },
+
+    "/api/meta/batch-status/:handleId": async (req) => {
+      try {
+        const handleId = req.params.handleId;
+        const status = await checkBatchStatus(handleId);
+        return Response.json(status);
+      } catch (error) {
+        console.error("Error checking batch status:", error);
+        return Response.json(
+          { error: String(error) },
+          { status: 500 }
+        );
+      }
     },
 
     "/api/products": {
