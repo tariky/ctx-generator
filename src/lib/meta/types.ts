@@ -46,6 +46,14 @@ export interface MetaBatchItemData {
   brand?: string;
   condition?: "new" | "refurbished" | "used";
   currency?: string;
+  // Multi-ratio images
+  "image[0].url"?: string;
+  "image[0].tag[0]"?: string;
+  "image[1].url"?: string;
+  "image[1].tag[0]"?: string;
+  "image[2].url"?: string;
+  "image[2].tag[0]"?: string;
+  "image[2].tag[1]"?: string;
 }
 
 export interface MetaBatchResponse {

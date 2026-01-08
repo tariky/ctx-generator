@@ -63,7 +63,7 @@ export async function performInitialSync(): Promise<SyncReport> {
 
     for (const product of wcProducts) {
       if (product.type === "variable" && product.variations.length > 0) {
-        // Fetch variations for variable products
+        // Fetch all variations for variable products
         console.log(`Fetching variations for product ${product.id}...`);
         const variations = await fetchWooCommerce(`/products/${product.id}/variations`, {
           per_page: "100",

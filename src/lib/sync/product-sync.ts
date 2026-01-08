@@ -132,7 +132,7 @@ export async function syncVariableProduct(product: WCProduct): Promise<{
   const result = { success: true, synced: 0, errors: 0 };
 
   try {
-    // Fetch variations
+    // Fetch all variations
     const variations = await fetchWooCommerce(`/products/${product.id}/variations`, {
       per_page: "100",
     }) as WCProduct[];

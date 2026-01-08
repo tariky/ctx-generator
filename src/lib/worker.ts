@@ -41,7 +41,7 @@ async function processChunk() {
   for (const product of products as WCProduct[]) {
     if (product.type === "variable" && product.variations.length > 0) {
       try {
-        // Fetch variations
+        // Fetch all variations
         const variations: WCProduct[] = await fetchWooCommerce(`/products/${product.id}/variations`, { per_page: "100" });
         
         let totalInventory = 0;
