@@ -269,7 +269,7 @@ export async function getProductErrors(limit = 50): Promise<any> {
 export async function getProductDetails(retailerId: string): Promise<any> {
   validateConfig();
 
-  // Fetch product with all image fields
+  // Fetch product with all fields
   const fields = [
     "id",
     "retailer_id",
@@ -285,6 +285,8 @@ export async function getProductDetails(retailerId: string): Promise<any> {
     "item_group_id",
     "size",
     "color",
+    "product_type",
+    "google_product_category",
   ].join(",");
 
   const url = `${META_BASE_URL}/${META_CATALOG_ID}/products?filter={"retailer_id":{"eq":"${retailerId}"}}&fields=${fields}`;
@@ -319,6 +321,8 @@ export async function getProductsByGroupId(groupId: string): Promise<any> {
     "item_group_id",
     "size",
     "color",
+    "product_type",
+    "google_product_category",
   ].join(",");
 
   const url = `${META_BASE_URL}/${META_CATALOG_ID}/products?filter={"item_group_id":{"eq":"${groupId}"}}&fields=${fields}`;

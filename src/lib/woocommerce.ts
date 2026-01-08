@@ -132,24 +132,25 @@ export function mapToMetaProduct(
 	if (original_image_link) {
 		const baseParams = `price=${encodedPrice}&discount_price=${encodedSalePrice}&name=${encodedName}&img=${encodedImg}&style=${style}`;
 
-		// Image 0: 1:1 square - MAIN image
+		// Image 0: 1:1 square - Default image (no tag needed, first image is default)
 		const imgenUrl1x1 = `https://imgen.lunatik.cloud/?${baseParams}&aspect_ratio=1:1`;
 		image_link = imgenUrl1x1;
-		images.push({ url: imgenUrl1x1, tag: ["MAIN"] });
+		images.push({ url: imgenUrl1x1, tag: [] });  // Default image, no tag
 		imageEntries["image[0].url"] = imgenUrl1x1;
-		imageEntries["image[0].tag[0]"] = "MAIN";
+		imageEntries["image[0].tag[0]"] = "";
 
-		// Image 1: 4:5 portrait for feed
+		// Image 1: 4:5 portrait for feed placements
 		const imgenUrl4x5 = `https://imgen.lunatik.cloud/?${baseParams}&aspect_ratio=4:5`;
-		images.push({ url: imgenUrl4x5, tag: ["4_5"] });
+		images.push({ url: imgenUrl4x5, tag: ["ASPECT_RATIO_4_5_PREFERRED"] });
 		imageEntries["image[1].url"] = imgenUrl4x5;
-		imageEntries["image[1].tag[0]"] = "4_5";
+		imageEntries["image[1].tag[0]"] = "ASPECT_RATIO_4_5_PREFERRED";
 
-		// Image 2: 9:16 for Stories/Reels
+		// Image 2: 9:16 for Stories and Reels (both tags for full coverage)
 		const imgenUrl9x16 = `https://imgen.lunatik.cloud/?${baseParams}&aspect_ratio=9:16`;
-		images.push({ url: imgenUrl9x16, tag: ["9_16"] });
+		images.push({ url: imgenUrl9x16, tag: ["STORY_PREFERRED", "REELS_PREFERRED"] });
 		imageEntries["image[2].url"] = imgenUrl9x16;
-		imageEntries["image[2].tag[0]"] = "9_16";
+		imageEntries["image[2].tag[0]"] = "STORY_PREFERRED";
+		imageEntries["image[2].tag[1]"] = "REELS_PREFERRED";
 	}
 
 	const brand = WC_BRAND;
@@ -193,8 +194,9 @@ export function mapToMetaProduct(
 		size,
 		// Use centralized item_group_id generation for consistency
 		item_group_id: generateItemGroupId(product, parent),
-		google_product_category: "", // Map from category if possible
-		product_type: product.categories?.map((c) => c.name).join(" > "),
+		// Use parent categories for variations, own categories for main products
+		google_product_category: "", // Can be mapped from category if needed
+		product_type: (parent?.categories || product.categories)?.map((c) => c.name).join(" > ") || "",
 		sale_price,
 		status: "active",
 		// Set inventory to 0 for out of stock products, otherwise use stock_quantity

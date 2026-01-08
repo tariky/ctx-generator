@@ -276,19 +276,20 @@ const server = serve({
                 condition: "new",
                 item_group_id: groupId,
                 size: variant.size,
-                // Multi-ratio images using proper array format
+                product_type: "Clothing > T-Shirts",  // Category hierarchy
+                // Multi-ratio images using proper array format with Meta tags
                 image: [
                   {
                     url: `https://imgen.lunatik.cloud/?${baseParams}&aspect_ratio=1:1`,
-                    tag: ["MAIN"]
+                    tag: []  // Default image, no tag needed
                   },
                   {
                     url: `https://imgen.lunatik.cloud/?${baseParams}&aspect_ratio=4:5`,
-                    tag: ["4_5"]
+                    tag: ["ASPECT_RATIO_4_5_PREFERRED"]  // 4:5 feed placements
                   },
                   {
                     url: `https://imgen.lunatik.cloud/?${baseParams}&aspect_ratio=9:16`,
-                    tag: ["9_16"]
+                    tag: ["STORY_PREFERRED", "REELS_PREFERRED"]  // Stories and Reels
                   }
                 ],
               },

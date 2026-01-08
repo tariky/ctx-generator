@@ -53,6 +53,8 @@ export interface MetaBatchItemData {
   item_group_id?: string;  // Groups variants together
   size?: string;
   color?: string;
+  product_type?: string;  // Category hierarchy (e.g., "Clothing > Shirts > T-Shirts")
+  google_product_category?: string;  // Google product taxonomy
   // Multi-ratio images array (use this OR image_link, not both)
   image?: MetaImage[];
 }

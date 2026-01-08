@@ -63,6 +63,16 @@ export function createBatchItem(
       data.color = product.color;
     }
 
+    // Add product type (category hierarchy)
+    if (product.product_type) {
+      data.product_type = product.product_type;
+    }
+
+    // Add google product category if available
+    if (product.google_product_category) {
+      data.google_product_category = product.google_product_category;
+    }
+
     // Build multi-ratio image array (use image array OR image_link, not both)
     const images: MetaImage[] = [];
 
