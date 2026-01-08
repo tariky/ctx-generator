@@ -242,21 +242,49 @@ const server = serve({
     },
 
     "/api/meta/test-product": {
-      async POST(req) {
+      async GET(req) {
+        console.log("=== TEST PRODUCT ENDPOINT CALLED (GET) ===");
         try {
-          // Test creating a single product with minimal data
           const testProduct = {
             retailer_id: `test_${Date.now()}`,
             name: "Test Product",
             description: "This is a test product to verify Meta Catalog API connection",
             availability: "in stock",
             price: "10.00 BAM",
-            url: "https://example.com/test-product",
-            image_link: "https://via.placeholder.com/500x500.png?text=Test+Product",
-            brand: "Test Brand",
+            url: "https://lunatik.ba/test-product",
+            image_link: "https://lunatik-website.fra1.digitaloceanspaces.com/wp-content/uploads/2026/01/07131111/9mST4FOuXf-I6OhVHOCu1.jpg",
+            brand: "Lunatik",
           };
 
+          console.log("Creating test product:", JSON.stringify(testProduct, null, 2));
           const result = await testSingleProductCreate(testProduct);
+          console.log("Test product result:", JSON.stringify(result, null, 2));
+          return Response.json(result);
+        } catch (error) {
+          console.error("Error testing product creation:", error);
+          return Response.json(
+            { error: String(error) },
+            { status: 500 }
+          );
+        }
+      },
+      async POST(req) {
+        console.log("=== TEST PRODUCT ENDPOINT CALLED (POST) ===");
+        try {
+          const testProduct = {
+            retailer_id: `test_${Date.now()}`,
+            name: "Test Product",
+            description: "This is a test product to verify Meta Catalog API connection",
+            availability: "in stock",
+            price: "10.00 BAM",
+            url: "https://lunatik.ba/test-product",
+            image_link: "https://lunatik-website.fra1.digitaloceanspaces.com/wp-content/uploads/2026/01/07131111/9mST4FOuXf-I6OhVHOCu1.jpg",
+            brand: "Lunatik",
+          };
+
+          console.log("Creating test product:", JSON.stringify(testProduct, null, 2));
+          const result = await testSingleProductCreate(testProduct);
+          console.log("Test product result:", JSON.stringify(result, null, 2));
           return Response.json(result);
         } catch (error) {
           console.error("Error testing product creation:", error);
