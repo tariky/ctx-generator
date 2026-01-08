@@ -4,7 +4,7 @@ import { generateProductFeed, generateBothFeeds } from "./lib/woocommerce";
 import { generateFastProductFeed, generateBothFastFeeds, refreshAndGenerateFeed } from "./lib/csv-generator";
 import { handleWebhook } from "./lib/webhooks/handler";
 import { performInitialSync } from "./lib/sync/initial-sync";
-import { getCatalogInfo, getCatalogProducts, testSingleProductCreate, checkCatalogDiagnostics, getProductErrors, checkBatchStatus } from "./lib/meta/client";
+import { getCatalogInfo, getCatalogProducts, testSingleProductCreate, checkCatalogDiagnostics, getProductErrors, checkBatchStatus, getProductDetails, getProductsByGroupId } from "./lib/meta/client";
 import { getProductCount, getInStockCount, getAllProducts } from "./lib/db/products";
 import { getSyncedCount, getPendingCount, getErrorCount } from "./lib/db/sync-status";
 import { getWebhookEventCount, getRecentWebhookEvents } from "./lib/webhooks/events";
@@ -339,6 +339,36 @@ const server = serve({
         return Response.json(status);
       } catch (error) {
         console.error("Error checking batch status:", error);
+        return Response.json(
+          { error: String(error) },
+          { status: 500 }
+        );
+      }
+    },
+
+    "/api/meta/product/:retailerId": async (req) => {
+      try {
+        const retailerId = req.params.retailerId;
+        console.log(`Fetching product: ${retailerId}`);
+        const product = await getProductDetails(retailerId);
+        return Response.json(product);
+      } catch (error) {
+        console.error("Error fetching product:", error);
+        return Response.json(
+          { error: String(error) },
+          { status: 500 }
+        );
+      }
+    },
+
+    "/api/meta/group/:groupId": async (req) => {
+      try {
+        const groupId = req.params.groupId;
+        console.log(`Fetching products in group: ${groupId}`);
+        const products = await getProductsByGroupId(groupId);
+        return Response.json(products);
+      } catch (error) {
+        console.error("Error fetching group products:", error);
         return Response.json(
           { error: String(error) },
           { status: 500 }

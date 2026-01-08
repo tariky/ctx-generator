@@ -266,6 +266,75 @@ export async function getProductErrors(limit = 50): Promise<any> {
   return response.json();
 }
 
+export async function getProductDetails(retailerId: string): Promise<any> {
+  validateConfig();
+
+  // Fetch product with all image fields
+  const fields = [
+    "id",
+    "retailer_id",
+    "name",
+    "description",
+    "availability",
+    "price",
+    "url",
+    "image_url",
+    "additional_image_urls",
+    "brand",
+    "condition",
+    "item_group_id",
+    "size",
+    "color",
+  ].join(",");
+
+  const url = `${META_BASE_URL}/${META_CATALOG_ID}/products?filter={"retailer_id":{"eq":"${retailerId}"}}&fields=${fields}`;
+
+  console.log(`Fetching product details from: ${url}`);
+
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${META_ACCESS_TOKEN}` },
+  });
+
+  const data = await response.json();
+  console.log(`Product details:`, JSON.stringify(data, null, 2));
+
+  return data;
+}
+
+export async function getProductsByGroupId(groupId: string): Promise<any> {
+  validateConfig();
+
+  const fields = [
+    "id",
+    "retailer_id",
+    "name",
+    "description",
+    "availability",
+    "price",
+    "url",
+    "image_url",
+    "additional_image_urls",
+    "brand",
+    "condition",
+    "item_group_id",
+    "size",
+    "color",
+  ].join(",");
+
+  const url = `${META_BASE_URL}/${META_CATALOG_ID}/products?filter={"item_group_id":{"eq":"${groupId}"}}&fields=${fields}`;
+
+  console.log(`Fetching products by group from: ${url}`);
+
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${META_ACCESS_TOKEN}` },
+  });
+
+  const data = await response.json();
+  console.log(`Products in group:`, JSON.stringify(data, null, 2));
+
+  return data;
+}
+
 export async function checkCatalogDiagnostics(): Promise<any> {
   validateConfig();
 
