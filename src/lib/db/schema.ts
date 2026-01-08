@@ -66,8 +66,7 @@ export function initSchema(db: Database): void {
     CREATE INDEX IF NOT EXISTS idx_meta_sync_status_product_id ON meta_sync_status(product_id);
     CREATE INDEX IF NOT EXISTS idx_webhook_events_processed ON webhook_events(processed);
     CREATE INDEX IF NOT EXISTS idx_webhook_events_wc_product_id ON webhook_events(wc_product_id);
-    CREATE INDEX IF NOT EXISTS idx_webhook_events_action_type ON webhook_events(action_type);
-    CREATE INDEX IF NOT EXISTS idx_webhook_events_product_name ON webhook_events(product_name);
-    CREATE INDEX IF NOT EXISTS idx_webhook_events_created_at ON webhook_events(created_at);
   `);
+  // Note: indexes for action_type, product_name, created_at are created in migrations.ts
+  // after the columns are added to existing tables
 }
