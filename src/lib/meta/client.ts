@@ -220,11 +220,11 @@ export async function testSingleProductCreate(testProduct: {
       retailer_id: testProduct.retailer_id,
       data: {
         id: testProduct.retailer_id,  // Required field
-        name: testProduct.name,
+        title: testProduct.name,  // Meta uses 'title' not 'name'
         description: testProduct.description || "No description",
         availability: testProduct.availability,
         price: testProduct.price,
-        url: testProduct.url,
+        link: testProduct.url,  // Meta uses 'link' not 'url'
         image_link: testProduct.image_link,
         brand: testProduct.brand,
         condition: "new",

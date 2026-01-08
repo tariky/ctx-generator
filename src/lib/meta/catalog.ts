@@ -45,10 +45,10 @@ export function createBatchItem(
   };
 
   if (!existsInCatalog) {
-    data.name = product.title;
+    data.title = product.title;  // Meta uses 'title' not 'name'
     data.description = product.description;
     data.image_link = product.image_link;
-    data.url = product.link;
+    data.link = product.link;  // Meta uses 'link' not 'url'
     data.price = product.price;
     data.brand = product.brand;
     data.condition = product.condition;

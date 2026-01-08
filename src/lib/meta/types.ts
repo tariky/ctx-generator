@@ -38,10 +38,10 @@ export interface MetaBatchItem {
 export interface MetaBatchItemData {
   availability?: "in stock" | "out of stock" | "preorder";
   inventory?: number;
-  name?: string;
+  title?: string;  // Meta uses 'title' not 'name'
   description?: string;
   image_link?: string;
-  url?: string;
+  link?: string;  // Meta uses 'link' not 'url'
   price?: string;
   brand?: string;
   condition?: "new" | "refurbished" | "used";
