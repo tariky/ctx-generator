@@ -103,7 +103,10 @@ export async function batchUpsertProducts(
     requests: items.map(item => ({
       method: item.method,
       retailer_id: item.retailer_id,
-      data: item.data,
+      data: {
+        id: item.retailer_id,  // Required field - must match retailer_id
+        ...item.data,
+      },
     })),
   };
 
@@ -216,6 +219,7 @@ export async function testSingleProductCreate(testProduct: {
       method: "CREATE",
       retailer_id: testProduct.retailer_id,
       data: {
+        id: testProduct.retailer_id,  // Required field
         name: testProduct.name,
         description: testProduct.description || "No description",
         availability: testProduct.availability,
