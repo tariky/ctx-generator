@@ -243,49 +243,85 @@ const server = serve({
 
     "/api/meta/test-product": {
       async GET(req) {
-        console.log("=== TEST PRODUCT ENDPOINT CALLED (GET) ===");
+        console.log("=== TEST PRODUCT WITH VARIANTS ENDPOINT CALLED ===");
         try {
-          const testProduct = {
-            retailer_id: `test_${Date.now()}`,
-            name: "Test Product",
-            description: "This is a test product to verify Meta Catalog API connection",
-            availability: "in stock",
-            price: "10.00 BAM",
-            url: "https://lunatik.ba/test-product",
-            image_link: "https://lunatik-website.fra1.digitaloceanspaces.com/wp-content/uploads/2026/01/07131111/9mST4FOuXf-I6OhVHOCu1.jpg",
-            brand: "Lunatik",
+          const timestamp = Date.now();
+          const groupId = `test_group_${timestamp}`;
+          const baseImage = "https://lunatik-website.fra1.digitaloceanspaces.com/wp-content/uploads/2026/01/07131111/9mST4FOuXf-I6OhVHOCu1.jpg";
+          const encodedImg = Buffer.from(baseImage).toString('base64');
+
+          // Create test variants with different sizes
+          const variants = [
+            { size: "S", price: "49.00 BAM" },
+            { size: "M", price: "49.00 BAM" },
+            { size: "L", price: "52.00 BAM" },
+          ];
+
+          const requests = variants.map((variant) => {
+            const encodedPrice = encodeURIComponent(variant.price);
+            const encodedName = encodeURIComponent(`Test Product - ${variant.size}`);
+            const baseParams = `price=${encodedPrice}&name=${encodedName}&img=${encodedImg}`;
+
+            return {
+              method: "CREATE" as const,
+              retailer_id: `${groupId}_${variant.size}`,
+              data: {
+                id: `${groupId}_${variant.size}`,
+                title: `Test Product - ${variant.size}`,
+                description: "This is a test product with variants and multi-ratio images to verify Meta Catalog API",
+                availability: "in stock",
+                price: variant.price,
+                link: "https://lunatik.ba/test-product",
+                brand: "Lunatik",
+                condition: "new",
+                item_group_id: groupId,
+                size: variant.size,
+                // Multi-ratio images using proper array format
+                image: [
+                  {
+                    url: `https://imgen.lunatik.cloud/?${baseParams}&aspect_ratio=1:1`,
+                    tag: ["MAIN"]
+                  },
+                  {
+                    url: `https://imgen.lunatik.cloud/?${baseParams}&aspect_ratio=4:5`,
+                    tag: ["4_5"]
+                  },
+                  {
+                    url: `https://imgen.lunatik.cloud/?${baseParams}&aspect_ratio=9:16`,
+                    tag: ["9_16"]
+                  }
+                ],
+              },
+            };
+          });
+
+          const url = "https://graph.facebook.com/v21.0/" + process.env.META_CATALOG_ID + "/items_batch";
+          const requestBody = {
+            item_type: "PRODUCT_ITEM",
+            requests: requests,
           };
 
-          console.log("Creating test product:", JSON.stringify(testProduct, null, 2));
-          const result = await testSingleProductCreate(testProduct);
-          console.log("Test product result:", JSON.stringify(result, null, 2));
-          return Response.json(result);
-        } catch (error) {
-          console.error("Error testing product creation:", error);
-          return Response.json(
-            { error: String(error) },
-            { status: 500 }
-          );
-        }
-      },
-      async POST(req) {
-        console.log("=== TEST PRODUCT ENDPOINT CALLED (POST) ===");
-        try {
-          const testProduct = {
-            retailer_id: `test_${Date.now()}`,
-            name: "Test Product",
-            description: "This is a test product to verify Meta Catalog API connection",
-            availability: "in stock",
-            price: "10.00 BAM",
-            url: "https://lunatik.ba/test-product",
-            image_link: "https://lunatik-website.fra1.digitaloceanspaces.com/wp-content/uploads/2026/01/07131111/9mST4FOuXf-I6OhVHOCu1.jpg",
-            brand: "Lunatik",
-          };
+          console.log("Creating test products with variants:", JSON.stringify(requestBody, null, 2));
 
-          console.log("Creating test product:", JSON.stringify(testProduct, null, 2));
-          const result = await testSingleProductCreate(testProduct);
-          console.log("Test product result:", JSON.stringify(result, null, 2));
-          return Response.json(result);
+          const response = await fetch(url, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${process.env.META_ACCESS_TOKEN}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(requestBody),
+          });
+
+          const result = await response.json();
+          console.log("Test products result:", JSON.stringify(result, null, 2));
+
+          return Response.json({
+            httpStatus: response.status,
+            result,
+            requestSent: requestBody,
+            groupId,
+            variantsCreated: variants.length,
+          });
         } catch (error) {
           console.error("Error testing product creation:", error);
           return Response.json(

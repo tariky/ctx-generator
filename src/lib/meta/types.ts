@@ -35,25 +35,26 @@ export interface MetaBatchItem {
   data: MetaBatchItemData;
 }
 
+export interface MetaImage {
+  url: string;
+  tag: string[];
+}
+
 export interface MetaBatchItemData {
   availability?: "in stock" | "out of stock" | "preorder";
   inventory?: number;
   title?: string;  // Meta uses 'title' not 'name'
   description?: string;
-  image_link?: string;
+  image_link?: string;  // Main image (use this OR image array, not both)
   link?: string;  // Meta uses 'link' not 'url'
-  price?: string;
+  price?: string;  // Price includes currency (e.g., "10.00 BAM")
   brand?: string;
   condition?: "new" | "refurbished" | "used";
-  currency?: string;
-  // Multi-ratio images
-  "image[0].url"?: string;
-  "image[0].tag[0]"?: string;
-  "image[1].url"?: string;
-  "image[1].tag[0]"?: string;
-  "image[2].url"?: string;
-  "image[2].tag[0]"?: string;
-  "image[2].tag[1]"?: string;
+  item_group_id?: string;  // Groups variants together
+  size?: string;
+  color?: string;
+  // Multi-ratio images array (use this OR image_link, not both)
+  image?: MetaImage[];
 }
 
 export interface MetaBatchResponse {

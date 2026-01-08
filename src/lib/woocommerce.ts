@@ -120,38 +120,41 @@ export function mapToMetaProduct(
 
 	// Generate multi-ratio images with tags
 	// Each ratio gets its own imgen URL with the appropriate aspect_ratio parameter
-	const imageEntries: Record<string, string> = {};
-
-	// Always initialize image columns (even if empty) for consistent CSV structure
-	imageEntries["image[0].url"] = "";
-	imageEntries["image[0].tag[0]"] = "";
-	imageEntries["image[1].url"] = "";
-	imageEntries["image[1].tag[0]"] = "";
-	imageEntries["image[2].url"] = "";
-	imageEntries["image[2].tag[0]"] = "";
-	imageEntries["image[2].tag[1]"] = "";
-
 	let image_link = "";
+	const images: Array<{ url: string; tag: string[] }> = [];
+
+	// CSV format columns (for backward compatibility with CSV export)
+	const imageEntries: Record<string, string> = {
+		"image[0].url": "",
+		"image[0].tag[0]": "",
+		"image[1].url": "",
+		"image[1].tag[0]": "",
+		"image[2].url": "",
+		"image[2].tag[0]": "",
+		"image[2].tag[1]": "",
+	};
 
 	if (original_image_link) {
 		const baseParams = `price=${encodedPrice}&discount_price=${encodedSalePrice}&name=${encodedName}&img=${encodedImg}&style=${style}`;
 
-		// Image 0: DEFAULT (1:1 square, used as image_link)
+		// Image 0: 1:1 square - MAIN image
 		const imgenUrl1x1 = `https://imgen.lunatik.cloud/?${baseParams}&aspect_ratio=1:1`;
-		imageEntries["image[0].url"] = imgenUrl1x1;
-		imageEntries["image[0].tag[0]"] = "DEFAULT";
 		image_link = imgenUrl1x1;
+		images.push({ url: imgenUrl1x1, tag: ["MAIN"] });
+		imageEntries["image[0].url"] = imgenUrl1x1;
+		imageEntries["image[0].tag[0]"] = "MAIN";
 
-		// Image 1: 4:5 portrait (ASPECT_RATIO_4_5_PREFERRED)
+		// Image 1: 4:5 portrait for feed
 		const imgenUrl4x5 = `https://imgen.lunatik.cloud/?${baseParams}&aspect_ratio=4:5`;
+		images.push({ url: imgenUrl4x5, tag: ["4_5"] });
 		imageEntries["image[1].url"] = imgenUrl4x5;
-		imageEntries["image[1].tag[0]"] = "ASPECT_RATIO_4_5_PREFERRED";
+		imageEntries["image[1].tag[0]"] = "4_5";
 
-		// Image 2: 9:16 Stories/Reels (STORY_PREFERRED and REELS_PREFERRED)
+		// Image 2: 9:16 for Stories/Reels
 		const imgenUrl9x16 = `https://imgen.lunatik.cloud/?${baseParams}&aspect_ratio=9:16`;
+		images.push({ url: imgenUrl9x16, tag: ["9_16"] });
 		imageEntries["image[2].url"] = imgenUrl9x16;
-		imageEntries["image[2].tag[0]"] = "STORY_PREFERRED";
-		imageEntries["image[2].tag[1]"] = "REELS_PREFERRED";
+		imageEntries["image[2].tag[0]"] = "9_16";
 	}
 
 	const brand = WC_BRAND;
@@ -187,10 +190,12 @@ export function mapToMetaProduct(
 		link,
 		image_link,
 		brand,
-		// Only include the three generated multi-ratio images, no additional WooCommerce images
+		// Multi-ratio images array for Meta API
+		images: images.length > 0 ? images : undefined,
 		age_group,
 		color,
 		gender,
+		size,
 		item_group_id: parent
 			? `wc_${parent.id}` // Variations: use parent ID as group ID
 			: product.type === "variable" && product.variations.length > 0
@@ -199,7 +204,6 @@ export function mapToMetaProduct(
 		google_product_category: "", // Map from category if possible
 		product_type: product.categories?.map((c) => c.name).join(" > "),
 		sale_price,
-		size,
 		status: "active",
 		// Set inventory to 0 for out of stock products, otherwise use stock_quantity
 		inventory:
@@ -208,7 +212,7 @@ export function mapToMetaProduct(
 				: product.stock_quantity ?? undefined,
 	};
 
-	// Merge multi-ratio image entries
+	// Merge multi-ratio image entries (for CSV export backward compatibility)
 	return { ...baseProduct, ...imageEntries };
 }
 
