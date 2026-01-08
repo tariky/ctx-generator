@@ -1,6 +1,20 @@
 import { serve } from "bun";
 import index from "./index.html";
 import { generateProductFeed, generateBothFeeds } from "./lib/woocommerce";
+import { generateFastProductFeed, generateBothFastFeeds, refreshAndGenerateFeed } from "./lib/csv-generator";
+import { handleWebhook } from "./lib/webhooks/handler";
+import { performInitialSync } from "./lib/sync/initial-sync";
+import { getProductCount, getInStockCount, getAllProducts } from "./lib/db/products";
+import { getSyncedCount, getPendingCount, getErrorCount } from "./lib/db/sync-status";
+import { getWebhookEventCount, getRecentWebhookEvents } from "./lib/webhooks/events";
+import { getDb } from "./lib/db/index";
+import {
+  validateCredentials,
+  createSession,
+  validateSession,
+  deleteSession,
+  getSessionFromRequest,
+} from "./lib/auth/session";
 
 const server = serve({
   routes: {
@@ -26,12 +40,35 @@ const server = serve({
     "/api/catalog/generate": {
       async GET(req) {
         try {
-          const { standard, christmas } = await generateBothFeeds();
+          const url = new URL(req.url);
+          const refresh = url.searchParams.get("refresh") === "true";
+
+          const startTime = Date.now();
+          let standard: string, christmas: string;
+
+          if (refresh) {
+            // Slow: fetch fresh from WooCommerce
+            console.log("Generating with fresh WooCommerce data...");
+            [standard, christmas] = await Promise.all([
+              refreshAndGenerateFeed("standard"),
+              refreshAndGenerateFeed("christmas"),
+            ]);
+          } else {
+            // Fast: use cached data
+            console.log("Generating from cache...");
+            const feeds = await generateBothFastFeeds();
+            standard = feeds.standard;
+            christmas = feeds.christmas;
+          }
+
           await Bun.write("public/product_catalog_standard.csv", standard);
           await Bun.write("public/product_catalog_christmas.csv", christmas);
-          return Response.json({ 
-            success: true, 
-            message: "Both catalogs generated successfully", 
+
+          const elapsed = Date.now() - startTime;
+          return Response.json({
+            success: true,
+            message: `Both catalogs generated in ${elapsed}ms`,
+            elapsed,
             urls: {
               standard: "/product_catalog_standard.csv",
               christmas: "/product_catalog_christmas.csv"
@@ -39,7 +76,35 @@ const server = serve({
           });
         } catch (error) {
           console.error("Catalog generation error:", error);
-          return new Response(JSON.stringify({ error: "Error generating catalog", details: String(error) }), { 
+          return new Response(JSON.stringify({ error: "Error generating catalog", details: String(error) }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+      },
+    },
+
+    "/api/catalog/refresh": {
+      async GET(req) {
+        try {
+          const url = new URL(req.url);
+          const style = url.searchParams.get("style") || "standard";
+          const validStyle = style === "christmas" ? "christmas" : "standard";
+
+          const startTime = Date.now();
+          const csv = await refreshAndGenerateFeed(validStyle);
+          const elapsed = Date.now() - startTime;
+
+          return new Response(csv, {
+            headers: {
+              "Content-Type": "text/csv",
+              "Content-Disposition": `attachment; filename="product_catalog_${validStyle}.csv"`,
+              "X-Generation-Time": `${elapsed}ms`,
+            },
+          });
+        } catch (error) {
+          console.error("Catalog refresh error:", error);
+          return new Response(JSON.stringify({ error: "Error refreshing catalog", details: String(error) }), {
             status: 500,
             headers: { "Content-Type": "application/json" }
           });
@@ -53,21 +118,170 @@ const server = serve({
           const url = new URL(req.url);
           const style = url.searchParams.get("style") || "standard";
           const validStyle = style === "christmas" ? "christmas" : "standard";
-          
-          const csv = await generateProductFeed(validStyle);
+          const slow = url.searchParams.get("slow") === "true";
+
+          const startTime = Date.now();
+          let csv: string;
+
+          if (slow) {
+            // Original slow method (fetches from WooCommerce each time)
+            csv = await generateProductFeed(validStyle);
+          } else {
+            // Fast method using cache
+            csv = await generateFastProductFeed(validStyle);
+          }
+
+          const elapsed = Date.now() - startTime;
+
           return new Response(csv, {
             headers: {
               "Content-Type": "text/csv",
               "Content-Disposition": `attachment; filename="product_catalog_${validStyle}.csv"`,
+              "X-Generation-Time": `${elapsed}ms`,
             },
           });
         } catch (error) {
           console.error("Catalog generation error:", error);
-          return new Response(JSON.stringify({ error: "Error generating catalog", details: String(error) }), { 
+          return new Response(JSON.stringify({ error: "Error generating catalog", details: String(error) }), {
             status: 500,
             headers: { "Content-Type": "application/json" }
           });
         }
+      },
+    },
+
+    "/api/webhooks/woocommerce": {
+      async POST(req) {
+        return handleWebhook(req);
+      },
+    },
+
+    "/api/sync/initial": {
+      async POST(req) {
+        try {
+          const report = await performInitialSync();
+          return Response.json({ success: true, report });
+        } catch (error) {
+          console.error("Initial sync error:", error);
+          return Response.json(
+            { success: false, error: String(error) },
+            { status: 500 }
+          );
+        }
+      },
+    },
+
+    "/api/sync/status": {
+      async GET(req) {
+        try {
+          // Initialize DB if not already
+          getDb();
+
+          const stats = {
+            products: {
+              total: getProductCount(),
+              inStock: getInStockCount(),
+            },
+            sync: {
+              synced: getSyncedCount(),
+              pending: getPendingCount(),
+              errors: getErrorCount(),
+            },
+            webhooks: getWebhookEventCount(),
+            recentWebhooks: getRecentWebhookEvents(5),
+          };
+          return Response.json(stats);
+        } catch (error) {
+          console.error("Error getting sync status:", error);
+          return Response.json(
+            { error: String(error) },
+            { status: 500 }
+          );
+        }
+      },
+    },
+
+    "/api/products": {
+      async GET(req) {
+        try {
+          const url = new URL(req.url);
+          const limit = parseInt(url.searchParams.get("limit") || "100");
+          const offset = parseInt(url.searchParams.get("offset") || "0");
+          const products = getAllProducts(limit, offset);
+          return Response.json({
+            products,
+            total: getProductCount(),
+            limit,
+            offset,
+          });
+        } catch (error) {
+          console.error("Error getting products:", error);
+          return Response.json(
+            { error: String(error) },
+            { status: 500 }
+          );
+        }
+      },
+    },
+
+    "/api/auth/login": {
+      async POST(req) {
+        try {
+          const body = await req.json();
+          const { username, password } = body as { username: string; password: string };
+
+          if (!validateCredentials(username, password)) {
+            return Response.json(
+              { success: false, error: "Invalid credentials" },
+              { status: 401 }
+            );
+          }
+
+          const token = createSession();
+          return new Response(
+            JSON.stringify({ success: true }),
+            {
+              status: 200,
+              headers: {
+                "Content-Type": "application/json",
+                "Set-Cookie": `session=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400`,
+              },
+            }
+          );
+        } catch (error) {
+          console.error("Login error:", error);
+          return Response.json(
+            { success: false, error: "Login failed" },
+            { status: 500 }
+          );
+        }
+      },
+    },
+
+    "/api/auth/logout": {
+      async POST(req) {
+        const token = getSessionFromRequest(req);
+        if (token) {
+          deleteSession(token);
+        }
+        return new Response(
+          JSON.stringify({ success: true }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              "Set-Cookie": "session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0",
+            },
+          }
+        );
+      },
+    },
+
+    "/api/auth/check": {
+      async GET(req) {
+        const token = getSessionFromRequest(req);
+        const authenticated = validateSession(token);
+        return Response.json({ authenticated });
       },
     },
 

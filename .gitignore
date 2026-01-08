@@ -35,3 +35,5 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 public/product_catalog.csv
 public/product_catalog_christmas.csv
 public/product_catalog_standard.csv
+
+/data
