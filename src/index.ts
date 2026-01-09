@@ -172,6 +172,27 @@ const server = serve({
       },
     },
 
+    "/api/sync/regenerate": {
+      async POST(req) {
+        try {
+          console.log("=== REGENERATE ALL IMAGES ===");
+          // This forces a full re-sync with new images for all products
+          const report = await performInitialSync();
+          return Response.json({
+            success: true,
+            message: `Regenerated images for ${report.synced} products`,
+            report,
+          });
+        } catch (error) {
+          console.error("Regenerate error:", error);
+          return Response.json(
+            { success: false, error: String(error) },
+            { status: 500 }
+          );
+        }
+      },
+    },
+
     "/api/sync/status": {
       async GET(req) {
         try {

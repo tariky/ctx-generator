@@ -42,54 +42,52 @@ export function createBatchItem(
     inventory: product.inventory,
   };
 
+  // Always include price - it may have changed
+  data.price = product.price;
+
+  // Always include sale_price - send empty string to clear it if removed
+  // This ensures Meta updates the sale price whether it's added, changed, or removed
+  data.sale_price = product.sale_price || "";
+
+  // Build multi-ratio image array - always include since price is embedded in image URL
+  const images: MetaImage[] = [];
+
+  if (product.images && Array.isArray(product.images)) {
+    console.log(`[createBatchItem] Using images array with ${product.images.length} images`);
+    images.push(...product.images);
+  } else if (product.image_link) {
+    console.log(`[createBatchItem] Fallback to single image_link: ${product.image_link.substring(0, 50)}...`);
+    images.push({ url: product.image_link, tag: [] });
+  } else {
+    console.log(`[createBatchItem] WARNING: No images available for ${product.id}`);
+  }
+
+  if (images.length > 0) {
+    data.image = images;
+  }
+
+  // For new products, include all metadata
   if (!existsInCatalog) {
-    data.title = product.title;  // Meta uses 'title' not 'name'
+    data.title = product.title;
     data.description = product.description;
-    data.link = product.link;  // Meta uses 'link' not 'url'
-    data.price = product.price;  // Price already includes currency (e.g., "10.00 BAM")
+    data.link = product.link;
     data.brand = product.brand;
     data.condition = product.condition;
 
-    // Group variants together using item_group_id
     if (product.item_group_id) {
       data.item_group_id = product.item_group_id;
     }
-
-    // Add size/color if available
     if (product.size) {
       data.size = product.size;
     }
     if (product.color) {
       data.color = product.color;
     }
-
-    // Add product type (category hierarchy)
     if (product.product_type) {
       data.product_type = product.product_type;
     }
-
-    // Add google product category if available
     if (product.google_product_category) {
       data.google_product_category = product.google_product_category;
-    }
-
-    // Build multi-ratio image array (use image array OR image_link, not both)
-    const images: MetaImage[] = [];
-
-    if (product.images && Array.isArray(product.images)) {
-      // Use pre-built images array from mapToMetaProduct
-      console.log(`[createBatchItem] Using images array with ${product.images.length} images`);
-      images.push(...product.images);
-    } else if (product.image_link) {
-      // Fallback: use single image_link as MAIN
-      console.log(`[createBatchItem] Fallback to single image_link: ${product.image_link.substring(0, 50)}...`);
-      images.push({ url: product.image_link, tag: [] });
-    } else {
-      console.log(`[createBatchItem] WARNING: No images available for ${product.id}`);
-    }
-
-    if (images.length > 0) {
-      data.image = images;
     }
   }
 

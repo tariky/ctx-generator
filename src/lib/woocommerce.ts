@@ -104,9 +104,9 @@ export function mapToMetaProduct(
 	// Only use the three generated multi-ratio images via imgen service, no additional WooCommerce images
 
 	const priceForImage = `${product.regular_price || product.price} KM`;
-	const salePriceForImage = product.sale_price
-		? `${product.sale_price} KM`
-		: "";
+	const hasSalePrice = !!product.sale_price && product.sale_price !== "";
+	const salePriceForImage = hasSalePrice ? `${product.sale_price} KM` : "";
+
 	const encodedName = encodeURIComponent(title);
 	const encodedPrice = encodeURIComponent(priceForImage);
 	const encodedSalePrice = encodeURIComponent(salePriceForImage);
@@ -131,7 +131,9 @@ export function mapToMetaProduct(
 	};
 
 	if (original_image_link) {
-		const baseParams = `price=${encodedPrice}&discount_price=${encodedSalePrice}&name=${encodedName}&img=${encodedImg}&style=${style}`;
+		// Only include discount_price param if there's actually a sale price
+		const discountParam = hasSalePrice ? `&discount_price=${encodedSalePrice}` : "";
+		const baseParams = `price=${encodedPrice}${discountParam}&name=${encodedName}&img=${encodedImg}&style=${style}`;
 
 		// Image 0: 1:1 square - Default image (no tag needed, first image is default)
 		const imgenUrl1x1 = `https://imgen.lunatik.cloud/?${baseParams}&aspect_ratio=1:1`;

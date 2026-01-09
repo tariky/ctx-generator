@@ -48,6 +48,7 @@ export interface MetaBatchItemData {
   image_link?: string;  // Main image (use this OR image array, not both)
   link?: string;  // Meta uses 'link' not 'url'
   price?: string;  // Price includes currency (e.g., "10.00 BAM")
+  sale_price?: string;  // Sale price with currency, empty string to clear
   brand?: string;
   condition?: "new" | "refurbished" | "used";
   item_group_id?: string;  // Groups variants together

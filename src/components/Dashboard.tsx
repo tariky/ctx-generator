@@ -173,6 +173,22 @@ export function Dashboard({ onLogout }: DashboardProps) {
     }
   };
 
+  const handleRegenerateImages = async () => {
+    startTask("regenerate", "Regenerating all product images with current prices...");
+    try {
+      const res = await fetch("/api/sync/regenerate", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        endTask(true, data.message);
+        fetchStats();
+      } else {
+        endTask(false, data.error || "Regeneration failed");
+      }
+    } catch (err) {
+      endTask(false, String(err));
+    }
+  };
+
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     onLogout();
@@ -377,9 +393,25 @@ export function Dashboard({ onLogout }: DashboardProps) {
                         "Run Initial Sync"
                       )}
                     </Button>
+                    <Button
+                      onClick={handleRegenerateImages}
+                      disabled={progress.active}
+                      variant="outline"
+                      size="lg"
+                    >
+                      {progress.active && progress.task === "regenerate" ? (
+                        <>
+                          <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          Regenerating...
+                        </>
+                      ) : (
+                        "Regenerate All Images"
+                      )}
+                    </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Fetches in-stock products from WooCommerce, stores in database, and syncs to Meta Catalog API
+                    <strong>Initial Sync:</strong> Fetches products from WooCommerce and syncs to Meta Catalog<br />
+                    <strong>Regenerate Images:</strong> Re-syncs all products with updated price images (use after price changes)
                   </p>
                 </div>
 
