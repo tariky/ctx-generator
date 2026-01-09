@@ -201,11 +201,12 @@ const server = serve({
           // Fetch all products from Meta catalog
           const catalogProducts = await getCatalogProducts();
 
-          // Filter for _main products and deduplicate
+          // Filter for _main products and deduplicate, filter out empty/invalid IDs
           const mainRetailerIds = new Set<string>();
           for (const p of catalogProducts) {
-            if (p.retailer_id?.endsWith("_main")) {
-              mainRetailerIds.add(p.retailer_id);
+            const rid = p.retailer_id;
+            if (rid && typeof rid === 'string' && rid.trim() && rid.endsWith("_main")) {
+              mainRetailerIds.add(rid.trim());
             }
           }
 
@@ -219,21 +220,22 @@ const server = serve({
 
           const uniqueIds = Array.from(mainRetailerIds);
           console.log(`Found ${uniqueIds.length} unique _main products to delete`);
+          console.log(`First 5 IDs:`, uniqueIds.slice(0, 5));
 
-          // Build delete batch request
-          const deleteRequests = uniqueIds.map((retailer_id) => ({
-            method: "DELETE" as const,
-            retailer_id,
-            data: {},
-          }));
-
-          // Send delete request in batches of 1000
-          const BATCH_SIZE = 1000;
+          // Send delete requests in smaller batches to avoid issues
+          const BATCH_SIZE = 100;
           let deleted = 0;
           let errors = 0;
 
-          for (let i = 0; i < deleteRequests.length; i += BATCH_SIZE) {
-            const chunk = deleteRequests.slice(i, i + BATCH_SIZE);
+          for (let i = 0; i < uniqueIds.length; i += BATCH_SIZE) {
+            const chunkIds = uniqueIds.slice(i, i + BATCH_SIZE);
+            const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+            console.log(`Processing batch ${batchNum} with ${chunkIds.length} items...`);
+
+            const requests = chunkIds.map((retailer_id) => ({
+              method: "DELETE",
+              retailer_id,
+            }));
 
             const url = `https://graph.facebook.com/v21.0/${process.env.META_CATALOG_ID}/items_batch`;
             const response = await fetch(url, {
@@ -244,26 +246,27 @@ const server = serve({
               },
               body: JSON.stringify({
                 item_type: "PRODUCT_ITEM",
-                requests: chunk,
+                requests,
               }),
             });
 
             const result = await response.json();
-            console.log(`Delete batch result:`, JSON.stringify(result, null, 2));
+            console.log(`Batch ${batchNum} result:`, JSON.stringify(result, null, 2));
 
-            if (result.error) {
-              errors += chunk.length;
+            if (result.error || result.validation_status?.[0]?.errors?.length) {
+              console.error(`Batch ${batchNum} had errors`);
+              errors += chunkIds.length;
             } else {
-              deleted += chunk.length;
+              deleted += chunkIds.length;
             }
           }
 
           return Response.json({
             success: errors === 0,
-            message: `Deleted ${deleted} _main products from Meta catalog`,
+            message: `Deleted ${deleted} _main products from Meta catalog (${errors} errors)`,
             deleted,
             errors,
-            products: uniqueIds,
+            totalFound: uniqueIds.length,
           });
         } catch (error) {
           console.error("Cleanup error:", error);
