@@ -58,10 +58,10 @@ async function handleProductCreated(product: WCProduct): Promise<void> {
     return;
   }
 
-  // Handle variable products (parent with variations)
+  // Handle variable products (parent with variations) - only sync variations, skip _main
   if (product.type === "variable") {
-    console.log(`Processing new variable product ${product.id}`);
-    // Fetch variations from API since webhook might not include full variation data
+    console.log(`Processing new variable product ${product.id} - syncing variations only`);
+    // Fetch and sync variations, skip the main product
     await syncVariableProduct(product);
     return;
   }
@@ -101,9 +101,9 @@ async function handleProductUpdated(product: WCProduct): Promise<void> {
   // Update SQLite
   upsertProduct(product);
 
-  // Handle variable products (parent with variations)
-  if (product.type === "variable" && product.variations?.length > 0) {
-    console.log(`Processing variable product ${product.id} with ${product.variations.length} variations`);
+  // Handle variable products (parent with variations) - only sync variations, skip _main
+  if (product.type === "variable") {
+    console.log(`Processing variable product ${product.id} - syncing variations only, skipping _main`);
     await syncVariableProduct(product);
     return;
   }

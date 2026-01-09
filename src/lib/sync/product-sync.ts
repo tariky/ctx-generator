@@ -161,13 +161,8 @@ export async function syncVariableProduct(product: WCProduct): Promise<{
       }
     }
 
-    // Also sync main variable product
-    const mainResult = await syncSingleProduct(product);
-    if (mainResult.success && mainResult.action !== "skipped") {
-      result.synced++;
-    } else if (!mainResult.success) {
-      result.errors++;
-    }
+    // Skip syncing main variable product (_main) - only variations have accurate prices
+    console.log(`Skipping main variable product ${product.id} - only synced ${variations.length} variations`);
 
     result.success = result.errors === 0;
     return result;

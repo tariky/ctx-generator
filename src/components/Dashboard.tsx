@@ -189,6 +189,22 @@ export function Dashboard({ onLogout }: DashboardProps) {
     }
   };
 
+  const handleCleanupMain = async () => {
+    startTask("cleanup", "Removing _main products from Meta catalog...");
+    try {
+      const res = await fetch("/api/sync/cleanup-main", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        endTask(true, data.message);
+        fetchStats();
+      } else {
+        endTask(false, data.error || "Cleanup failed");
+      }
+    } catch (err) {
+      endTask(false, String(err));
+    }
+  };
+
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     onLogout();
@@ -408,10 +424,26 @@ export function Dashboard({ onLogout }: DashboardProps) {
                         "Regenerate All Images"
                       )}
                     </Button>
+                    <Button
+                      onClick={handleCleanupMain}
+                      disabled={progress.active}
+                      variant="destructive"
+                      size="lg"
+                    >
+                      {progress.active && progress.task === "cleanup" ? (
+                        <>
+                          <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          Cleaning up...
+                        </>
+                      ) : (
+                        "Delete _main Products"
+                      )}
+                    </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">
                     <strong>Initial Sync:</strong> Fetches products from WooCommerce and syncs to Meta Catalog<br />
-                    <strong>Regenerate Images:</strong> Re-syncs all products with updated price images (use after price changes)
+                    <strong>Regenerate Images:</strong> Re-syncs all products with updated price images<br />
+                    <strong>Delete _main:</strong> Removes variable parent products from Meta (only variations should be synced)
                   </p>
                 </div>
 

@@ -193,6 +193,84 @@ const server = serve({
       },
     },
 
+    "/api/sync/cleanup-main": {
+      async POST(req) {
+        try {
+          console.log("=== CLEANUP _MAIN PRODUCTS FROM META CATALOG ===");
+
+          // Fetch all products from Meta catalog
+          const catalogProducts = await getCatalogProducts();
+
+          // Filter for _main products
+          const mainProducts = catalogProducts.filter((p: any) =>
+            p.retailer_id?.endsWith("_main")
+          );
+
+          if (mainProducts.length === 0) {
+            return Response.json({
+              success: true,
+              message: "No _main products found in catalog",
+              deleted: 0,
+            });
+          }
+
+          console.log(`Found ${mainProducts.length} _main products to delete`);
+
+          // Build delete batch request
+          const deleteRequests = mainProducts.map((p: any) => ({
+            method: "DELETE" as const,
+            retailer_id: p.retailer_id,
+            data: {},
+          }));
+
+          // Send delete request in batches of 1000
+          const BATCH_SIZE = 1000;
+          let deleted = 0;
+          let errors = 0;
+
+          for (let i = 0; i < deleteRequests.length; i += BATCH_SIZE) {
+            const chunk = deleteRequests.slice(i, i + BATCH_SIZE);
+
+            const url = `https://graph.facebook.com/v21.0/${process.env.META_CATALOG_ID}/items_batch`;
+            const response = await fetch(url, {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${process.env.META_ACCESS_TOKEN}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                item_type: "PRODUCT_ITEM",
+                requests: chunk,
+              }),
+            });
+
+            const result = await response.json();
+            console.log(`Delete batch result:`, JSON.stringify(result, null, 2));
+
+            if (result.error) {
+              errors += chunk.length;
+            } else {
+              deleted += chunk.length;
+            }
+          }
+
+          return Response.json({
+            success: errors === 0,
+            message: `Deleted ${deleted} _main products from Meta catalog`,
+            deleted,
+            errors,
+            products: mainProducts.map((p: any) => p.retailer_id),
+          });
+        } catch (error) {
+          console.error("Cleanup error:", error);
+          return Response.json(
+            { success: false, error: String(error) },
+            { status: 500 }
+          );
+        }
+      },
+    },
+
     "/api/sync/status": {
       async GET(req) {
         try {

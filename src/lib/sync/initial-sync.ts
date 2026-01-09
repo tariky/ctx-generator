@@ -83,21 +83,9 @@ export async function performInitialSync(): Promise<SyncReport> {
           }
         }
 
-        // Also add main variable product if in stock
-        if (product.stock_status === "instock") {
-          report.inStock++;
-          const metaProduct = mapToMetaProduct(product);
-          const metaRetailerId = generateMetaRetailerId(product);
-          const exists = catalogState.has(metaRetailerId);
-
-          upsertSyncStatus(product.id, metaRetailerId, {
-            sync_status: "pending",
-            meta_product_exists: exists ? 1 : 0,
-          });
-
-          batchItems.push(createBatchItem(metaProduct, exists));
-          productIdMap.set(metaRetailerId, product.id);
-        }
+        // Skip syncing the main variable product (_main) - only sync variations
+        // Variable parents don't have accurate prices/sale prices, only variations do
+        console.log(`Skipping main variable product ${product.id} - only syncing its variations`);
       } else if (product.stock_status === "instock") {
         // Simple product
         report.inStock++;
