@@ -22,6 +22,7 @@ export interface WCProduct {
   stock_status: string;
   stock_quantity: number | null;
   images: WCImage[];
+  image?: WCImage; // Variations use single image instead of images array
   attributes: any[];
   variations: number[];
   parent_id: number;

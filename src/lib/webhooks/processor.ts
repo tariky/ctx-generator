@@ -44,18 +44,46 @@ export async function processWebhookEvent(
 
 async function handleProductCreated(product: WCProduct): Promise<void> {
   console.log(`Handling product.created for ${product.id}`);
+  console.log(`Product type: ${product.type}, parent_id: ${product.parent_id}, stock_status: ${product.stock_status}`);
+
+  // Detect if this is a variation
+  const isVariation = product.type === "variation" || product.parent_id > 0;
 
   // Store in SQLite
   upsertProduct(product);
 
-  // If in stock, sync to Meta Catalog
-  if (product.stock_status === "instock") {
-    if (product.type === "variable" && product.variations?.length > 0) {
-      await syncVariableProduct(product);
-    } else {
+  // If out of stock, don't sync to Meta
+  if (product.stock_status !== "instock") {
+    console.log(`Product ${product.id} is not in stock, skipping Meta sync`);
+    return;
+  }
+
+  // Handle variable products (parent with variations)
+  if (product.type === "variable") {
+    console.log(`Processing new variable product ${product.id}`);
+    // Fetch variations from API since webhook might not include full variation data
+    await syncVariableProduct(product);
+    return;
+  }
+
+  // Handle variation creation - need to fetch parent for proper mapping
+  if (isVariation && product.parent_id > 0) {
+    console.log(`Processing new variation ${product.id} of parent ${product.parent_id}`);
+    try {
+      const parent = await fetchWooCommerce(`/products/${product.parent_id}`) as WCProduct;
+      product.type = "variation";
+      await syncSingleProduct(product, parent);
+    } catch (error) {
+      console.error(`Error fetching parent product ${product.parent_id}:`, error);
+      // Still try to sync with what we have
       await syncSingleProduct(product);
     }
+    return;
   }
+
+  // Handle simple product
+  console.log(`Processing new simple product ${product.id}`);
+  await syncSingleProduct(product);
 }
 
 async function handleProductUpdated(product: WCProduct): Promise<void> {

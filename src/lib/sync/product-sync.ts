@@ -40,6 +40,15 @@ export async function syncSingleProduct(product: WCProduct, parent?: WCProduct):
   try {
     const metaRetailerId = generateMetaRetailerId(product, parent);
 
+    // Debug logging for image data
+    console.log(`[syncSingleProduct] Product ${product.id}:`);
+    console.log(`  - type: ${product.type}, parent_id: ${product.parent_id}`);
+    console.log(`  - product.image: ${product.image?.src || 'none'}`);
+    console.log(`  - product.images[0]: ${product.images?.[0]?.src || 'none'}`);
+    if (parent) {
+      console.log(`  - parent.images[0]: ${parent.images?.[0]?.src || 'none'}`);
+    }
+
     // Store/update product in SQLite
     upsertProduct(product, parent);
 
@@ -77,6 +86,17 @@ export async function syncSingleProduct(product: WCProduct, parent?: WCProduct):
 
     // Sync to Meta Catalog
     const metaProduct = mapToMetaProduct(product, parent);
+
+    // Debug: log what images are being sent
+    console.log(`[syncSingleProduct] MetaProduct for ${metaRetailerId}:`);
+    console.log(`  - image_link: ${metaProduct.image_link || 'none'}`);
+    console.log(`  - images count: ${(metaProduct as any).images?.length || 0}`);
+    if ((metaProduct as any).images?.length > 0) {
+      (metaProduct as any).images.forEach((img: any, i: number) => {
+        console.log(`  - images[${i}]: ${img.url?.substring(0, 80)}...`);
+      });
+    }
+
     const existsInMeta = await getProductByRetailerId(metaRetailerId);
 
     // Create or update sync status

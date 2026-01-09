@@ -97,9 +97,10 @@ export function mapToMetaProduct(
 		? `${product.sale_price} ${WC_CURRENCY}`
 		: undefined;
 
-	const link = product.permalink;
+	const link = product.permalink || mainProduct.permalink;
+	// Variations use 'image' (singular), products use 'images' (array)
 	const original_image_link =
-		product.images?.[0]?.src || mainProduct.images?.[0]?.src || "";
+		product.image?.src || product.images?.[0]?.src || mainProduct.images?.[0]?.src || "";
 	// Only use the three generated multi-ratio images via imgen service, no additional WooCommerce images
 
 	const priceForImage = `${product.regular_price || product.price} KM`;

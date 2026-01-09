@@ -78,10 +78,14 @@ export function createBatchItem(
 
     if (product.images && Array.isArray(product.images)) {
       // Use pre-built images array from mapToMetaProduct
+      console.log(`[createBatchItem] Using images array with ${product.images.length} images`);
       images.push(...product.images);
     } else if (product.image_link) {
       // Fallback: use single image_link as MAIN
-      images.push({ url: product.image_link, tag: ["MAIN"] });
+      console.log(`[createBatchItem] Fallback to single image_link: ${product.image_link.substring(0, 50)}...`);
+      images.push({ url: product.image_link, tag: [] });
+    } else {
+      console.log(`[createBatchItem] WARNING: No images available for ${product.id}`);
     }
 
     if (images.length > 0) {
