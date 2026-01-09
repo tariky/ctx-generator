@@ -201,12 +201,15 @@ const server = serve({
           // Fetch all products from Meta catalog
           const catalogProducts = await getCatalogProducts();
 
-          // Filter for _main products
-          const mainProducts = catalogProducts.filter((p: any) =>
-            p.retailer_id?.endsWith("_main")
-          );
+          // Filter for _main products and deduplicate
+          const mainRetailerIds = new Set<string>();
+          for (const p of catalogProducts) {
+            if (p.retailer_id?.endsWith("_main")) {
+              mainRetailerIds.add(p.retailer_id);
+            }
+          }
 
-          if (mainProducts.length === 0) {
+          if (mainRetailerIds.size === 0) {
             return Response.json({
               success: true,
               message: "No _main products found in catalog",
@@ -214,12 +217,13 @@ const server = serve({
             });
           }
 
-          console.log(`Found ${mainProducts.length} _main products to delete`);
+          const uniqueIds = Array.from(mainRetailerIds);
+          console.log(`Found ${uniqueIds.length} unique _main products to delete`);
 
           // Build delete batch request
-          const deleteRequests = mainProducts.map((p: any) => ({
+          const deleteRequests = uniqueIds.map((retailer_id) => ({
             method: "DELETE" as const,
-            retailer_id: p.retailer_id,
+            retailer_id,
             data: {},
           }));
 
@@ -259,7 +263,7 @@ const server = serve({
             message: `Deleted ${deleted} _main products from Meta catalog`,
             deleted,
             errors,
-            products: mainProducts.map((p: any) => p.retailer_id),
+            products: uniqueIds,
           });
         } catch (error) {
           console.error("Cleanup error:", error);
