@@ -201,7 +201,7 @@ const server = serve({
           // Fetch all products from Meta catalog
           const catalogProducts = await getCatalogProducts();
 
-          // Filter for _main products and deduplicate, filter out empty/invalid IDs
+          // Filter for _main products and deduplicate
           const mainRetailerIds = new Set<string>();
           for (const p of catalogProducts) {
             const rid = p.retailer_id;
@@ -220,19 +220,24 @@ const server = serve({
 
           const uniqueIds = Array.from(mainRetailerIds);
           console.log(`Found ${uniqueIds.length} unique _main products to delete`);
-          console.log(`First 5 IDs:`, uniqueIds.slice(0, 5));
+          console.log(`Sample IDs to delete: ${uniqueIds.slice(0, 5).join(", ")}`);
 
-          // Send delete requests in smaller batches to avoid issues
-          const BATCH_SIZE = 100;
+          // Delete in small batches with delay between batches
+          const BATCH_SIZE = 50;
+          const DELAY_MS = 2000; // 2 seconds between batches
           let deleted = 0;
           let errors = 0;
+          const errorDetails: string[] = [];
 
           for (let i = 0; i < uniqueIds.length; i += BATCH_SIZE) {
-            const chunkIds = uniqueIds.slice(i, i + BATCH_SIZE);
+            const batch = uniqueIds.slice(i, i + BATCH_SIZE);
             const batchNum = Math.floor(i / BATCH_SIZE) + 1;
-            console.log(`Processing batch ${batchNum} with ${chunkIds.length} items...`);
+            const totalBatches = Math.ceil(uniqueIds.length / BATCH_SIZE);
 
-            const requests = chunkIds.map((retailer_id) => ({
+            console.log(`Processing batch ${batchNum}/${totalBatches} (${batch.length} items)`);
+
+            // Build batch request - each item is a separate DELETE request
+            const requests = batch.map(retailer_id => ({
               method: "DELETE",
               retailer_id,
             }));
@@ -251,15 +256,41 @@ const server = serve({
             });
 
             const result = await response.json();
-            console.log(`Batch ${batchNum} result:`, JSON.stringify(result, null, 2));
+            console.log(`Batch ${batchNum} response:`, JSON.stringify(result, null, 2));
 
-            if (result.error || result.validation_status?.[0]?.errors?.length) {
-              console.error(`Batch ${batchNum} had errors`);
-              errors += chunkIds.length;
+            if (result.error) {
+              console.error(`Batch ${batchNum} API error:`, result.error);
+              errors += batch.length;
+              if (errorDetails.length < 5) {
+                errorDetails.push(`Batch ${batchNum}: ${result.error.message}`);
+              }
+            } else if (result.validation_status) {
+              // Process individual results
+              for (const status of result.validation_status) {
+                if (status.errors?.length) {
+                  errors++;
+                  if (errorDetails.length < 10) {
+                    errorDetails.push(`${status.retailer_id}: ${status.errors[0]?.message}`);
+                  }
+                } else {
+                  deleted++;
+                }
+              }
             } else {
-              deleted += chunkIds.length;
+              // No validation_status means async processing - assume success
+              deleted += batch.length;
+            }
+
+            console.log(`Batch ${batchNum} complete. Total: ${deleted} deleted, ${errors} errors`);
+
+            // Wait before next batch to avoid rate limiting
+            if (i + BATCH_SIZE < uniqueIds.length) {
+              console.log(`Waiting ${DELAY_MS}ms before next batch...`);
+              await new Promise(resolve => setTimeout(resolve, DELAY_MS));
             }
           }
+
+          console.log(`Cleanup complete: ${deleted} deleted, ${errors} errors`);
 
           return Response.json({
             success: errors === 0,
@@ -267,6 +298,7 @@ const server = serve({
             deleted,
             errors,
             totalFound: uniqueIds.length,
+            sampleErrors: errorDetails,
           });
         } catch (error) {
           console.error("Cleanup error:", error);
