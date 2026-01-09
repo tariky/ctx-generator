@@ -135,6 +135,50 @@ export async function batchUpsertProducts(
   return result;
 }
 
+export async function batchDeleteProducts(
+  retailerIds: string[]
+): Promise<MetaBatchResponse> {
+  validateConfig();
+
+  const url = `${META_BASE_URL}/${META_CATALOG_ID}/items_batch`;
+
+  // For DELETE, we need to include the id in data (same as CREATE/UPDATE)
+  const requestBody = {
+    item_type: "PRODUCT_ITEM",
+    requests: retailerIds.map(retailer_id => ({
+      method: "DELETE",
+      retailer_id,
+      data: {
+        id: retailer_id,
+      },
+    })),
+  };
+
+  console.log(`Sending DELETE batch request to: ${url}`);
+  console.log(`Delete batch size: ${retailerIds.length} items`);
+  console.log(`Request body:`, JSON.stringify(requestBody, null, 2));
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${META_ACCESS_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  const result = await response.json() as MetaBatchResponse;
+
+  console.log(`Delete batch response status: ${response.status}`);
+  console.log(`Delete batch response:`, JSON.stringify(result, null, 2));
+
+  if (!response.ok) {
+    console.error(`Meta API HTTP Error: ${response.status}`);
+  }
+
+  return result;
+}
+
 export async function updateProductStock(
   retailerId: string,
   availability: "in stock" | "out of stock" | "preorder",

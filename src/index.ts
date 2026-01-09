@@ -4,7 +4,7 @@ import { generateProductFeed, generateBothFeeds } from "./lib/woocommerce";
 import { generateFastProductFeed, generateBothFastFeeds, refreshAndGenerateFeed } from "./lib/csv-generator";
 import { handleWebhook } from "./lib/webhooks/handler";
 import { performInitialSync } from "./lib/sync/initial-sync";
-import { getCatalogInfo, getCatalogProducts, testSingleProductCreate, checkCatalogDiagnostics, getProductErrors, checkBatchStatus, getProductDetails, getProductsByGroupId } from "./lib/meta/client";
+import { getCatalogInfo, getCatalogProducts, testSingleProductCreate, checkCatalogDiagnostics, getProductErrors, checkBatchStatus, getProductDetails, getProductsByGroupId, batchDeleteProducts } from "./lib/meta/client";
 import { getProductCount, getInStockCount, getAllProducts } from "./lib/db/products";
 import { getSyncedCount, getPendingCount, getErrorCount } from "./lib/db/sync-status";
 import { getWebhookEventCount, getRecentWebhookEvents, searchWebhookEvents, getWebhookStats, getWebhookEventById } from "./lib/webhooks/events";
@@ -214,18 +214,18 @@ const server = serve({
             return Response.json({
               success: true,
               message: "No _main products found in catalog",
-              deleted: 0,
+              updated: 0,
             });
           }
 
           const uniqueIds = Array.from(mainRetailerIds);
-          console.log(`Found ${uniqueIds.length} unique _main products to delete`);
-          console.log(`Sample IDs to delete: ${uniqueIds.slice(0, 5).join(", ")}`);
+          console.log(`Found ${uniqueIds.length} unique _main products to mark as out of stock`);
+          console.log(`Sample IDs: ${uniqueIds.slice(0, 5).join(", ")}`);
 
-          // Delete in small batches with delay between batches
+          // Mark as out of stock in batches (DELETE not supported in Meta API)
           const BATCH_SIZE = 50;
-          const DELAY_MS = 2000; // 2 seconds between batches
-          let deleted = 0;
+          const DELAY_MS = 1000;
+          let updated = 0;
           let errors = 0;
           const errorDetails: string[] = [];
 
@@ -236,10 +236,15 @@ const server = serve({
 
             console.log(`Processing batch ${batchNum}/${totalBatches} (${batch.length} items)`);
 
-            // Build batch request - each item is a separate DELETE request
+            // Build batch UPDATE request to mark as out of stock
             const requests = batch.map(retailer_id => ({
-              method: "DELETE",
+              method: "UPDATE",
               retailer_id,
+              data: {
+                id: retailer_id,
+                availability: "out of stock",
+                inventory: 0,
+              },
             }));
 
             const url = `https://graph.facebook.com/v21.0/${process.env.META_CATALOG_ID}/items_batch`;
@@ -273,29 +278,28 @@ const server = serve({
                     errorDetails.push(`${status.retailer_id}: ${status.errors[0]?.message}`);
                   }
                 } else {
-                  deleted++;
+                  updated++;
                 }
               }
             } else {
               // No validation_status means async processing - assume success
-              deleted += batch.length;
+              updated += batch.length;
             }
 
-            console.log(`Batch ${batchNum} complete. Total: ${deleted} deleted, ${errors} errors`);
+            console.log(`Batch ${batchNum} complete. Total: ${updated} updated, ${errors} errors`);
 
             // Wait before next batch to avoid rate limiting
             if (i + BATCH_SIZE < uniqueIds.length) {
-              console.log(`Waiting ${DELAY_MS}ms before next batch...`);
               await new Promise(resolve => setTimeout(resolve, DELAY_MS));
             }
           }
 
-          console.log(`Cleanup complete: ${deleted} deleted, ${errors} errors`);
+          console.log(`Cleanup complete: ${updated} marked out of stock, ${errors} errors`);
 
           return Response.json({
             success: errors === 0,
-            message: `Deleted ${deleted} _main products from Meta catalog (${errors} errors)`,
-            deleted,
+            message: `Marked ${updated} _main products as out of stock (${errors} errors)`,
+            updated,
             errors,
             totalFound: uniqueIds.length,
             sampleErrors: errorDetails,
